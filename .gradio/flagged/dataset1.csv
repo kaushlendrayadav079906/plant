@@ -1,0 +1,12 @@
+Upload a Plant Image,Detected Plant,Plant Information,timestamp
+.gradio\flagged\Upload a Plant Image\ac427b94acecb0df848b\OIP 6.jpeg,.gradio\flagged\Detected Plant\d2ccf90e708cc54df337\image.webp,"<h3>🌿 Detected Plant Information</h3><h4>Medicinal-Neem</h4>
+                <p>
+                  <b>Scientific Name:</b> Azadirachta indica<br>
+                  <b>Common Name:</b> Neem<br>
+                  <b>Local Name:</b> Neem (various regional names exist)<br>
+                  <b>Family:</b> Meliaceae<br>
+                  <b>Genus:</b> Azadirachta<br>
+                  <b>Location:</b> Indian Subcontinent<br>
+                  <b>Medicinal Uses:</b> Neem has a wide range of traditional medicinal uses, including treatment for skin diseases, infections, fever, and as an anti-inflammatory and anti-parasitic agent. It is also used in dental hygiene and as a natural insecticide.
+                </p>
+                <hr>",2025-10-12 12:50:45.514473
