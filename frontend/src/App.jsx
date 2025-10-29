@@ -1,14 +1,9 @@
+import React, { useRef, useState, useEffect } from 'react';
 import axios from 'axios';
-import { Bot, Image as ImageIcon, Loader2, Upload, User, X } from 'lucide-react';
-// --- THIS IS THE FIX ---
-// We must import 'React' itself, not just the hooks.
-import React, { useRef, useState } from 'react';
+import { Bot, Image as ImageIcon, Loader2, Upload, User, X, Camera } from 'lucide-react';
 
 // --- Loading Components ---
-const Spinner = () => (
-  <Loader2 className="animate-spin h-5 w-5 mr-3" />
-);
-
+const Spinner = () => <Loader2 className="animate-spin h-5 w-5 mr-3" />;
 const SkeletonLoader = () => (
   <div className="animate-pulse space-y-4">
     <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-xl" />
@@ -20,37 +15,41 @@ const SkeletonLoader = () => (
 
 // --- Main App Component ---
 export default function App() {
-  const [activeTab, setActiveTab] = useState('detect'); // 'detect' or 'chat'
+  const [activeTab, setActiveTab] = useState('detect');
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  
+
+  // --- Camera State ---
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const [cameraStream, setCameraStream] = useState(null);
+
   // --- Detection State ---
-  const [detectionResult, setDetectionResult] = useState(null); // Will hold { annotated_image, plant_data }
+  const [detectionResult, setDetectionResult] = useState(null);
 
   // --- Chat State ---
-  const [chatPlantName, setChatPlantName] = useState('your plant'); // Plant context for chat
+  const [chatPlantName, setChatPlantName] = useState('your plant');
   const [chatInput, setChatInput] = useState('');
   const [chatMessages, setChatMessages] = useState([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
-  
-  // --- THIS IS THE FIX ---
-  const [isDark, setIsDark] = useState(false); // You were missing this line
+
+  // --- Dark Mode ---
+  const [isDark, setIsDark] = useState(false);
 
   const fileInputRef = useRef(null);
+  const API_URL = 'http://localhost:8000';
 
-  // --- API URL ---
-  // This is the address of your Python backend
-  const API_URL = 'http://localhost:8000'; 
-
-  // --- File Handling ---
+  // --- File Upload ---
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       setSelectedFile(file);
       setPreviewUrl(URL.createObjectURL(file));
-      clearResults(); // Clear old results when a new file is up
+      clearResults();
     }
   };
 
@@ -65,134 +64,155 @@ export default function App() {
     setSelectedFile(null);
     setPreviewUrl(null);
     clearResults();
-    if (fileInputRef.current) {
-      fileInputRef.current.value = null; // Reset the file input
+    if (fileInputRef.current) fileInputRef.current.value = null;
+  };
+
+  // --- CAMERA FUNCTIONS ---
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      setCameraStream(stream);
+      setCameraOpen(true);
+      setCameraError(null);
+    } catch (err) {
+      console.error(err);
+      setCameraError('Unable to access camera. Please allow permissions.');
     }
   };
 
-  // --- Detection API Call ---
+  useEffect(() => {
+    if (cameraOpen && videoRef.current && cameraStream) {
+      videoRef.current.srcObject = cameraStream;
+    }
+  }, [cameraOpen, cameraStream]);
+
+  const capturePhoto = () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob((blob) => {
+      const file = new File([blob], 'captured_image.jpg', { type: 'image/jpeg' });
+      setSelectedFile(file);
+      setPreviewUrl(URL.createObjectURL(blob));
+      clearResults();
+    }, 'image/jpeg');
+
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+    }
+    setCameraOpen(false);
+    setCameraStream(null);
+  };
+
+  // --- Detection ---
   const handleSubmitDetection = async () => {
     if (!selectedFile) return;
-
     setIsLoading(true);
     setError(null);
     setDetectionResult(null);
 
-    // We use FormData to send a file
     const formData = new FormData();
     formData.append('file', selectedFile);
 
     try {
-      // Make the API call to our /predict endpoint
       const response = await axios.post(`${API_URL}/predict`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      
       setDetectionResult(response.data);
-      
-      // Set plant name for chat context
-      if (response.data.plant_data && response.data.plant_data.length > 0 && !response.data.plant_data[0].error) {
+
+      if (response.data.plant_data?.length > 0 && !response.data.plant_data[0].error) {
         const plantName = response.data.plant_data[0].name || 'your plant';
         setChatPlantName(plantName);
-        // Pre-populate chat with a welcome message
-        setChatMessages([
-          { sender: 'bot', text: `I've identified ${plantName}. Feel free to ask me any questions about it!` }
-        ]);
+        setChatMessages([{ sender: 'bot', text: `I've identified ${plantName}. Ask me anything about it!` }]);
       } else {
-        setChatMessages([
-          { sender: 'bot', text: "I couldn't detect a specific plant, but you can still ask general questions." }
-        ]);
+        setChatMessages([{ sender: 'bot', text: "I couldn't detect a specific plant." }]);
       }
-      
     } catch (err) {
       console.error(err);
-      setError('An error occurred during detection. Is the backend server running?');
+      setError('Error during detection. Is backend running?');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // --- Chat API Call ---
+  // --- Chat ---
   const handleSubmitChat = async (e) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
 
     const userMessage = { sender: 'user', text: chatInput };
-    setChatMessages(prev => [...prev, userMessage]);
+    setChatMessages((prev) => [...prev, userMessage]);
     setChatInput('');
     setIsChatLoading(true);
 
     try {
-      // Make the API call to our /chat endpoint
       const response = await axios.post(`${API_URL}/chat`, {
         plant_name: chatPlantName,
         message: chatInput,
       });
-
       const botMessage = { sender: 'bot', text: response.data.response || response.data.error };
-      setChatMessages(prev => [...prev, botMessage]);
-
+      setChatMessages((prev) => [...prev, botMessage]);
     } catch (err) {
-      console.error(err);
-      const errorMessage = { sender: 'bot', text: 'Sorry, I ran into an error. Please try again.' };
-      setChatMessages(prev => [...prev, errorMessage]);
+      setChatMessages((prev) => [...prev, { sender: 'bot', text: 'Error, please try again.' }]);
     } finally {
       setIsChatLoading(false);
     }
   };
 
-
-  // --- Render the UI ---
+  // --- UI ---
   return (
-    // This div controls the dark mode
     <div className={isDark ? 'dark' : ''}>
-      <div className="flex flex-col min-h-screen bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-200 transition-colors duration-300">
-        
-        {/* --- Header --- */}
+      <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
+        {/* Header */}
         <header className="bg-white dark:bg-gray-800 shadow-md sticky top-0 z-10">
-          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="container mx-auto px-4 py-4 flex justify-between items-center">
             <h1 className="text-2xl md:text-3xl font-bold text-green-700 dark:text-green-400">
               🌿 Medicinal Plant Recognition
             </h1>
             <button
               onClick={() => setIsDark(!isDark)}
-              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-              aria-label="Toggle dark mode"
+              className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg"
             >
               {isDark ? '🌞' : '🌙'}
             </button>
           </div>
         </header>
 
-        {/* --- Main Content (2-column layout on large screens) --- */}
-        <main className="flex-grow container mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-          
-          {/* --- Left Column (Input) --- */}
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-xl flex flex-col h-full">
-            <h2 className="text-2xl font-semibold mb-4 text-green-600 dark:text-green-400">1. Upload Your Image</h2>
-            
-            {/* File Input Area */}
-            <div 
-              className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 flex flex-col items-center justify-center text-center cursor-pointer hover:border-green-400 dark:hover:border-green-500 transition-colors"
-              onClick={() => fileInputRef.current && fileInputRef.current.click()}
+        {/* Main */}
+        <main className="container mx-auto flex-grow p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* LEFT: Upload + Camera */}
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-xl flex flex-col">
+            <h2 className="text-2xl font-semibold mb-4 text-green-600 dark:text-green-400">
+              1. Upload or Capture Image
+            </h2>
+
+            <div
+              className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 flex flex-col items-center justify-center cursor-pointer hover:border-green-400 dark:hover:border-green-500 transition"
+              onClick={() => fileInputRef.current.click()}
             >
-              <input 
-                type="file" 
+              <input
+                type="file"
                 ref={fileInputRef}
-                onChange={handleFileChange} 
-                className="hidden" 
-                accept="image/*" 
+                onChange={handleFileChange}
+                accept="image/*"
+                className="hidden"
               />
+
               {previewUrl ? (
                 <div className="relative">
-                  <img src={previewUrl} alt="Preview" className="max-h-60 rounded-lg object-contain" />
+                  <img src={previewUrl} alt="Preview" className="max-h-60 rounded-lg" />
                   <button
                     onClick={(e) => {
-                      e.stopPropagation(); // Prevent re-opening file dialog
+                      e.stopPropagation();
                       clearSelection();
                     }}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg hover:bg-red-600 transition-all"
-                    aria-label="Clear selection"
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow"
                   >
                     <X size={16} />
                   </button>
@@ -200,177 +220,166 @@ export default function App() {
               ) : (
                 <>
                   <Upload className="h-12 w-12 text-gray-400 dark:text-gray-500 mb-2" />
-                  <span className="font-medium text-gray-600 dark:text-gray-300">Click to upload an image</span>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">PNG, JPG, or WEBP</span>
+                  <span className="text-gray-600 dark:text-gray-300">Click to upload</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">PNG, JPG, WEBP</span>
                 </>
               )}
             </div>
-            
-            {/* Submit Button */}
+
+            {/* Camera Button */}
+            <button
+              onClick={startCamera}
+              className="mt-4 bg-blue-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-blue-700 transition"
+            >
+              <Camera className="h-5 w-5" /> Open Camera
+            </button>
+
+            {/* Camera Stream */}
+            {cameraOpen && (
+              <div className="mt-4 flex flex-col items-center">
+                {cameraError ? (
+                  <p className="text-red-600">{cameraError}</p>
+                ) : (
+                  <>
+                    <video ref={videoRef} autoPlay className="w-72 h-56 rounded-lg shadow mb-3"></video>
+                    <button
+                      onClick={capturePhoto}
+                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+                    >
+                      Capture Photo
+                    </button>
+                    <canvas ref={canvasRef} className="hidden"></canvas>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Detect Button */}
             <button
               onClick={handleSubmitDetection}
               disabled={!selectedFile || isLoading}
-              className="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg mt-6 flex items-center justify-center transition-all
-                      hover:bg-green-700 
-                      disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
+              className="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg mt-6 flex justify-center hover:bg-green-700 disabled:bg-gray-400"
             >
               {isLoading ? <Spinner /> : 'Detect Plant'}
             </button>
           </div>
 
-          {/* --- Right Column (Output) --- */}
+          {/* RIGHT: Output + Chat */}
           <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-xl flex flex-col h-full">
-            {/* Tab Headers */}
             <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
               <button
                 onClick={() => setActiveTab('detect')}
-                className={`py-2 px-4 font-medium transition-all ${
-                  activeTab === 'detect' 
-                  ? 'border-b-2 border-green-600 text-green-600 dark:text-green-400 dark:border-green-400' 
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                className={`py-2 px-4 font-medium ${
+                  activeTab === 'detect'
+                    ? 'border-b-2 border-green-600 text-green-600 dark:text-green-400'
+                    : 'text-gray-400'
                 }`}
               >
                 Detection Result
               </button>
               <button
                 onClick={() => setActiveTab('chat')}
-                className={`py-2 px-4 font-medium transition-all ${
-                  activeTab === 'chat' 
-                  ? 'border-b-2 border-green-600 text-green-600 dark:text-green-400 dark:border-green-400' 
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                className={`py-2 px-4 font-medium ${
+                  activeTab === 'chat'
+                    ? 'border-b-2 border-green-600 text-green-600 dark:text-green-400'
+                    : 'text-gray-400'
                 }`}
               >
                 Ask Gemini
               </button>
             </div>
 
-            {/* --- Tab Content --- */}
-            <div className="flex-grow flex flex-col min-h-[400px]">
-              {error && (
-                <div className="bg-red-100 border border-red-400 text-red-700 dark:bg-red-900 dark:text-red-200 dark:border-red-700 px-4 py-3 rounded relative" role="alert">
-                  <strong className="font-bold">Error: </strong>
-                  <span className="block sm:inline">{error}</span>
-                </div>
-              )}
-
-              {/* --- Detection Tab --- */}
-              {activeTab === 'detect' && (
-                <div className="flex flex-col h-full">
-                  {!detectionResult && !isLoading && !error && (
-                    <div className="flex-grow flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 text-center">
-                      <ImageIcon size={64} className="mb-4" />
-                      <h3 className="text-xl font-medium">Your results will appear here</h3>
-                      <p>Upload an image and click "Detect Plant" to begin.</p>
-                    </div>
-                  )}
-
-                  {isLoading && (
-                    <div className="flex-grow flex items-center justify-center">
-                      <SkeletonLoader />
-                    </div>
-                  )}
-                  
-                  {detectionResult && (
-                    <div className="flex-grow overflow-y-auto space-y-4 pr-2">
-                      {/* Annotated Image */}
-                      <div>
-                        <h3 className="text-xl font-semibold mb-2 text-green-600 dark:text-green-400">Annotated Image</h3>
-                        <img 
-                          src={`data:image/jpeg;base64,${detectionResult.annotated_image}`} 
-                          alt="Detected Plant" 
-                          className="rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 w-full"
-                        />
-                      </div>
-
-                      {/* Plant Info */}
-                      <h3 className="text-xl font-semibold mb-2 text-green-600 dark:text-green-400">Plant Information</h3>
-                      {detectionResult.plant_data.map((plant, index) => (
-                        <div key={index} className="bg-green-50 dark:bg-gray-700 border border-green-200 dark:border-gray-600 p-4 rounded-lg">
-                          <h4 className="text-lg font-bold text-green-800 dark:text-green-300">{plant.name}</h4>
-                          {plant.error ? (
-                            <p className="text-red-600 dark:text-red-400">{plant.error}</p>
-                          ) : (
-                            <ul className="text-sm space-y-1 mt-2 text-gray-700 dark:text-gray-300">
-                              <li><strong>Scientific Name:</strong> {plant.scientific_name}</li>
-                              <li><strong>Common Name:</strong> {plant.common_name}</li>
-                              <li><strong>Local Name:</strong> {plant.local_name}</li>
-                              <li><strong>Family:</strong> {plant.family_name}</li>
-                              <li><strong>Medicinal Uses:</strong> {plant.medicinal_uses}</li>
-                            </ul>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* --- Chat Tab --- */}
-              {activeTab === 'chat' && (
-                <div className="flex flex-col h-full">
-                  {/* Chat History */}
-                  <div className="flex-grow overflow-y-auto bg-gray-50 dark:bg-gray-700 rounded-lg p-4 space-y-4 mb-4 min-h-[400px]">
-                    {chatMessages.length === 0 && (
-                      <div className="flex-grow flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 text-center h-full">
-                        <Bot size={64} className="mb-4" />
-                        <h3 className="text-xl font-medium">Chat with the Botanist AI</h3>
-                        <p>First, detect a plant. Then, ask questions about it here!</p>
-                      </div>
-                    )}
-                    {chatMessages.map((msg, index) => (
-                      <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`flex items-start gap-2 max-w-xs md:max-w-md ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
-                          <div className={`flex-shrink-0 p-2 rounded-full ${msg.sender === 'user' ? 'bg-blue-500 text-white' : 'bg-green-600 text-white'}`}>
-                            {msg.sender === 'user' ? <User size={20} /> : <Bot size={20} />}
-                          </div>
-                          <div className={`px-4 py-3 rounded-lg ${msg.sender === 'user' ? 'bg-blue-100 text-gray-800 dark:bg-blue-800 dark:text-gray-100' : 'bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-100'}`}>
-                            {msg.text}
-                          </div>
-                        </div>
+            {/* Detection + Chat */}
+            {activeTab === 'detect' ? (
+              <div className="flex-grow">
+                {isLoading && <SkeletonLoader />}
+                {!isLoading && detectionResult && (
+                  <div>
+                    <img
+                      src={`data:image/jpeg;base64,${detectionResult.annotated_image}`}
+                      alt="Detected"
+                      className="rounded-lg border border-gray-200 w-full mb-4"
+                    />
+                    {detectionResult.plant_data.map((plant, i) => (
+                      <div
+                        key={i}
+                        className="bg-green-50 dark:bg-gray-700 p-4 rounded-lg mb-3"
+                      >
+                        <h4 className="font-bold text-green-700 dark:text-green-300">
+                          {plant.name}
+                        </h4>
+                        <ul className="text-sm mt-2 space-y-1">
+                          <li>
+                            <b>Scientific:</b> {plant.scientific_name}
+                          </li>
+                          <li>
+                            <b>Common:</b> {plant.common_name}
+                          </li>
+                          <li>
+                            <b>Family:</b> {plant.family_name}
+                          </li>
+                          <li>
+                            <b>Uses:</b> {plant.medicinal_uses}
+                          </li>
+                        </ul>
                       </div>
                     ))}
-                    {isChatLoading && (
-                      <div className="flex justify-start">
-                        <div className="flex items-start gap-2 max-w-xs md:max-w-md">
-                          <div className="flex-shrink-0 p-2 rounded-full bg-green-600 text-white">
-                            <Bot size={20} />
-                          </div>
-                          <div className="px-4 py-3 rounded-lg bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-100">
-                            <Loader2 className="h-5 w-5 animate-spin" />
-                          </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col flex-grow">
+                <div className="flex-grow overflow-y-auto bg-gray-50 dark:bg-gray-700 rounded-lg p-4 space-y-3">
+                  {chatMessages.map((msg, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex ${
+                        msg.sender === 'user' ? 'justify-end' : 'justify-start'
+                      }`}
+                    >
+                      <div
+                        className={`flex items-start gap-2 ${
+                          msg.sender === 'user' ? 'flex-row-reverse' : ''
+                        }`}
+                      >
+                        <div
+                          className={`p-2 rounded-full ${
+                            msg.sender === 'user' ? 'bg-blue-500' : 'bg-green-600'
+                          } text-white`}
+                        >
+                          {msg.sender === 'user' ? <User size={20} /> : <Bot size={20} />}
+                        </div>
+                        <div
+                          className={`px-4 py-2 rounded-lg ${
+                            msg.sender === 'user' ? 'bg-blue-100' : 'bg-gray-100'
+                          }`}
+                        >
+                          {msg.text}
                         </div>
                       </div>
-                    )}
-                  </div>
-                  
-                  {/* Chat Input */}
-                  <form onSubmit={handleSubmitChat} className="flex gap-2">
-                    <input
-                      type="text"
-                      value={chatInput}
-                      // --- THIS IS THE SECOND FIX ---
-                      // It was 'e.T.value', it's now 'e.target.value'
-                      onChange={(e) => setChatInput(e.target.value)}
-                      placeholder={`Ask about ${chatPlantName}...`}
-                      className="flex-grow border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <button
-                      type="submit"
-                      disabled={isChatLoading}
-                      className="bg-green-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-green-700 transition-colors
-                                  disabled:bg-gray-300 dark:disabled:bg-gray-600"
-                    >
-                      Send
-                    </button>
-                  </form>
+                    </div>
+                  ))}
                 </div>
-              )}
-            </div>
+                <form onSubmit={handleSubmitChat} className="flex gap-2 mt-3">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder={`Ask about ${chatPlantName}...`}
+                    className="flex-grow p-2 border rounded-lg"
+                  />
+                  <button
+                    type="submit"
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+                  >
+                    Send
+                  </button>
+                </form>
+              </div>
+            )}
           </div>
         </main>
       </div>
     </div>
   );
 }
-
-
