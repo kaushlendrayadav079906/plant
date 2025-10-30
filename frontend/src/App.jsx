@@ -173,7 +173,7 @@ export default function App() {
         <header className="bg-white dark:bg-gray-800 shadow-md sticky top-0 z-10">
           <div className="container mx-auto px-4 py-4 flex justify-between items-center">
             <h1 className="text-2xl md:text-3xl font-bold text-green-700 dark:text-green-400">
-              🌿 Medicinal Plant Recognition
+              🌿 Medicinal Plant Recognition System
             </h1>
             <button
               onClick={() => setIsDark(!isDark)}
@@ -285,7 +285,7 @@ export default function App() {
                     : 'text-gray-400'
                 }`}
               >
-                Ask Gemini
+                Search More Information Related To Plants.
               </button>
             </div>
 
