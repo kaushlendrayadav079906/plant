@@ -1,0 +1,7 @@
+[build]
+  command = "pip install -r requirements.txt"
+  publish = "frontend/dist"  # Adjust if the frontend build output is elsewhere, or remove if backend-only
+
+[build.environment]
+  PIP_NO_CACHE_DIR = "1"
+  PYTHON_VERSION = "3.11" # Good practice to pin python version
