@@ -2,10 +2,17 @@ import { History, Leaf, Menu, Moon, Sun, X } from 'lucide-react';
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 
-export default function Navbar({ isDark, setIsDark }) {
+export default function Navbar({ isDark, setIsDark, setShowSplash }) {
   const [isOpen, setIsOpen] = useState(false);
 
   const toggleMenu = () => setIsOpen(!isOpen);
+
+  const handleNavClick = (linkName) => {
+    setIsOpen(false);
+    if (linkName === "Home") {
+      setShowSplash(true);
+    }
+  };
 
   const navLinks = [
     { name: "Home", path: "/", icon: <Leaf size={20} /> },
@@ -17,7 +24,11 @@ export default function Navbar({ isDark, setIsDark }) {
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <NavLink to="/" className="flex items-center gap-2 group">
+          <NavLink 
+            to="/" 
+            className="flex items-center gap-2 group"
+            onClick={() => setShowSplash(true)}
+          >
             <div className="bg-green-100 dark:bg-green-900/50 p-2 rounded-lg group-hover:bg-green-200 dark:group-hover:bg-green-800 transition-colors">
               <Leaf className="text-green-600 dark:text-green-400 w-6 h-6" />
             </div>
@@ -32,6 +43,7 @@ export default function Navbar({ isDark, setIsDark }) {
               <NavLink
                 key={link.name}
                 to={link.path}
+                onClick={() => handleNavClick(link.name)}
                 className={({ isActive }) =>
                   `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                     isActive
@@ -85,7 +97,7 @@ export default function Navbar({ isDark, setIsDark }) {
             <NavLink
               key={link.name}
               to={link.path}
-              onClick={() => setIsOpen(false)}
+              onClick={() => handleNavClick(link.name)}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium transition-colors ${
                   isActive

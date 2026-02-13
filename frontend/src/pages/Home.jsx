@@ -14,8 +14,8 @@ const SkeletonLoader = () => (
 );
 
 // --- Home Component ---
-export default function Home() {
-  const [showSplash, setShowSplash] = useState(true);
+export default function Home({ showSplash, setShowSplash }) {
+  // const [showSplash, setShowSplash] = useState(true); // Lifted to App.jsx
   const [activeTab, setActiveTab] = useState('detect');
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -173,28 +173,81 @@ export default function Home() {
     }
   };
 
+  // --- Splash Screen Logic ---
+  const backgroundImages = [
+    "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=2560&auto=format&fit=crop", // Nature wide
+    "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?q=80&w=2560&auto=format&fit=crop", // Forest
+    "https://images.unsplash.com/photo-1501854140884-074bf86ee91c?q=80&w=2560&auto=format&fit=crop", // Dark leaves
+    "https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?q=80&w=2560&auto=format&fit=crop", // Garden
+    "https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?q=80&w=2560&auto=format&fit=crop"  // Green droplets
+  ];
+
+  const [currentBgIndex, setCurrentBgIndex] = useState(0);
+
+  useEffect(() => {
+    if (!showSplash) return;
+    const interval = setInterval(() => {
+       setCurrentBgIndex((prev) => (prev + 1) % backgroundImages.length);
+    }, 3000); // Change image every 3 seconds
+    return () => clearInterval(interval);
+  }, [showSplash]);
+
   // --- UI ---
   if (showSplash) {
     return (
       <div 
-        className="h-screen w-screen flex flex-col items-center justify-center bg-gradient-to-br from-green-600 to-emerald-900 text-white cursor-pointer relative overflow-hidden select-none"
+        className="fixed inset-0 z-[100] flex flex-col items-center justify-center text-white cursor-pointer select-none overflow-hidden bg-black"
         onClick={() => setShowSplash(false)}
       >
-        {/* Background Overlay */}
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?q=80&w=2574&auto=format&fit=crop')] bg-cover bg-center opacity-20 mix-blend-overlay"></div>
+        {/* Background Slideshow */}
+        {backgroundImages.map((img, index) => (
+            <div 
+                key={index}
+                className={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ease-in-out ${index === currentBgIndex ? 'opacity-100' : 'opacity-0'} scale-110`}
+                style={{ backgroundImage: `url(${img})` }}
+            />
+        ))}
+
+        {/* Radial Gradient Overlay for Focus */}
+        <div className="absolute inset-0 bg-radial-gradient from-black/20 via-black/60 to-black/90 backdrop-blur-[2px]"></div>
         
-        <div className="z-10 text-center p-8 animate-in fade-in zoom-in duration-1000 flex flex-col items-center">
-          <div className="w-24 h-24 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center mb-6 shadow-2xl ring-4 ring-white/20">
-             <Bot className="w-12 h-12 text-white drop-shadow-lg" />
+        {/* Content Container */}
+        <div className="z-10 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in duration-1000">
+          
+          {/* Brand Overline */}
+          <div className="mb-8 text-lime-400 font-bold tracking-[0.3em] uppercase text-sm animate-in slide-in-from-top-4 duration-1000 drop-shadow-md">
+            PlantAI Technology
           </div>
-          <h1 className="text-4xl md:text-6xl font-extrabold mb-4 drop-shadow-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-green-100">
-            Medicinal Plant Recognition System
+
+          {/* COLORFUL CIRCULAR LOGO */}
+          {/* Creating a multi-color gradient ring */}
+          <div className="relative mb-8 group">
+             <div className="absolute -inset-1 bg-gradient-to-r from-teal-400 via-green-500 to-lime-500 rounded-full blur opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-tilt"></div>
+             <div className="relative w-36 h-36 bg-black rounded-full flex items-center justify-center ring-4 ring-white/10 shadow-2xl overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-tr from-green-900/50 to-transparent"></div>
+                <Leaf className="w-16 h-16 text-emerald-400 drop-shadow-[0_0_15px_rgba(52,211,153,0.5)] transform transition-transform group-hover:scale-110 duration-500" />
+             </div>
+          </div>
+
+          {/* Heading */}
+          <h1 className="font-black mb-6 drop-shadow-2xl leading-tight">
+            <span className="block text-4xl md:text-6xl text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-200 to-white tracking-wide uppercase mb-2">
+              Medicinal Plant
+            </span>
+            <span className="block text-3xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-green-400 to-lime-300 pb-2">
+              Recognition System
+            </span>
           </h1>
-          <p className="text-xl md:text-2xl font-light opacity-90 drop-shadow-md mt-4 max-w-2xl leading-relaxed">
-            Discover the healing power of nature with AI.
+
+          <p className="text-lg md:text-2xl font-medium text-gray-300 max-w-2xl leading-relaxed mb-12 drop-shadow-lg">
+            Instant identification & detailed healing properties <br className="hidden md:block"/>powered by advanced AI.
           </p>
-          <div className="mt-12 animate-pulse text-sm font-semibold tracking-widest uppercase opacity-75">
-            Tap anywhere to begin
+
+          <div className="group relative px-8 py-4 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full overflow-hidden transition-all duration-300 hover:scale-105 border border-white/20 hover:border-green-400/50 shadow-[0_0_30px_rgba(0,0,0,0.3)]">
+            <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]"></div>
+            <span className="relative text-sm font-bold tracking-[0.2em] uppercase text-white group-hover:text-green-300 transition-colors flex items-center gap-3">
+              Tap to Explore <span className="text-lg">→</span>
+            </span>
           </div>
         </div>
       </div>
@@ -407,7 +460,33 @@ export default function Home() {
       {/* --- NEW PLANT INFORMATION SECTION --- */}
       {!isLoading && detectionResult && detectionResult.plant_data && detectionResult.plant_data.length > 0 && (
         <div className="w-full space-y-6">
-          {detectionResult.plant_data.map((plant, i) => (
+          {detectionResult.plant_data.map((plant, i) => {
+            // Check for specific error indicating plant not found or no info
+            if (plant.error || plant.scientific_name === "Not Available") {
+                return (
+                    <div key={i} className="animate-in fade-in slide-in-from-bottom-4 duration-700 w-full flex justify-center mt-8">
+                        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 max-w-2xl text-center border-l-8 border-red-500">
+                             <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                                <Leaf className="w-10 h-10 text-red-500" />
+                             </div>
+                             <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-4">Plant Information Not Available</h2>
+                             <p className="text-xl text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
+                                {plant.error || "We detected a plant, but it is not currently in our medicinal database, and we couldn't verify its details online."}
+                             </p>
+                             <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl inline-block text-left text-sm text-gray-500 dark:text-gray-400">
+                                <p className="font-bold mb-1">Why am I seeing this?</p>
+                                <ul className="list-disc list-inside space-y-1">
+                                    <li>The plant might not be a recognized medicinal species.</li>
+                                    <li>The image might be unclear or contain non-plant objects.</li>
+                                    <li>Our strict accuracy filters prevented showing unverified data.</li>
+                                </ul>
+                             </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
              <div key={i} className="animate-in fade-in slide-in-from-bottom-4 duration-700">
                
                {/* 1. TOP CARD: Quick Safety Result */}
@@ -852,7 +931,8 @@ export default function Home() {
                 </div>
 
              </div>
-          ))}
+          
+          )})}
         </div>
       )}
     </div>

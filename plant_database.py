@@ -57,6 +57,19 @@ PLANT_DATABASE = {
             "growth_speed": "Slow",
             "harvest_time": "Year-round"
         },
+        "farming_guide": {
+            "market_demand": "Very High (Cosmetics, Beverages)",
+            "economic_benefits": "High profitability in cosmetic and pharma sectors.",
+            "best_harvest_season": "Year-round (after 18 months)",
+            "common_diseases": "Leaf spot, Root rot (if overwatered)",
+            "prevention_tips": "Avoid waterlogging, use well-draining soil."
+        },
+        "research_data": {
+            "botanical_morphology": "Perennial, succulent, pea-green color, triangular fleshy leaves with serrated edges.",
+            "chemical_constituents": "Aloin, Barbaloin, Polysaccharides (Acemannan), Vitamins, Enzymes.",
+            "potential_research_areas": "Wound healing, Anti-diabetic effects, Skin aging reversal.",
+            "distribution_status": "Widely cultivated globally, originated in Arabian Peninsula."
+        },
         "similar_plants": [
             {"name": "Agave", "status": "Irritant Sap"}
         ]
@@ -112,6 +125,19 @@ PLANT_DATABASE = {
             "growth_speed": "Moderate",
             "harvest_time": "Winter"
         },
+        "farming_guide": {
+            "market_demand": "High (Ayurvedic & Food Industry)",
+            "economic_benefits": "Fruit (Pickles, Chyawanprash), Powder, Oil.",
+            "best_harvest_season": "October-February",
+            "common_diseases": "Bark eating caterpillar, Rust",
+            "prevention_tips": "Regular pruning, clean cultivation."
+        },
+        "research_data": {
+            "botanical_morphology": "Deciduous tree, feathery leaves, spherical pale green fruit.",
+            "chemical_constituents": "Ascorbic acid (Vit C), Gallotannins, Ellagic acid.",
+            "potential_research_areas": "Anti-cancer, Hair growth, Anti-aging.",
+            "distribution_status": "Native to tropical India and Southeast Asia."
+        },
         "similar_plants": []
     },
 
@@ -164,6 +190,19 @@ PLANT_DATABASE = {
             "soil": "Dry/Sandy",
             "growth_speed": "Slow",
             "harvest_time": "6 months"
+        },
+        "farming_guide": {
+            "market_demand": "High (Global Nootropic Market)",
+            "economic_benefits": "Roots sold for supplements, capsules, powder.",
+            "best_harvest_season": "Starting of Winter (Jan-Mar)",
+            "common_diseases": "Leaf blight, Seedling rot",
+            "prevention_tips": "Seed treatment with fungicides."
+        },
+        "research_data": {
+            "botanical_morphology": "Erect branching shrub, stellate tomentose branches.",
+            "chemical_constituents": "Withaferin A, Withanolides.",
+            "potential_research_areas": "Neuroprotection, Stress resilience, Cancer therapy.",
+            "distribution_status": "Drier regions of India, Middle East, Africa."
         },
         "similar_plants": [
              {"name": "Physalis (Cape Gooseberry)", "status": "Edible Fruit"}
@@ -302,6 +341,140 @@ PLANT_DATABASE = {
         ]
     },
 
+    "Medicinal-Arive Dantu": {
+        "scientific_name": "Aerva lanata",
+        "common_name": "Mountain Knotgrass",
+        "local_name": "Arive Dantu, Pashanbhed",
+        "family_name": "Amaranthaceae",
+        "plant_description": "A woody, prostrate or succulent herb with white woolly flowers.",
+        "plant_type": "Herb",
+        "ideal_climate": "Tropical/Dry",
+        "native_location": "India, Sri Lanka, Africa",
+        "primary_body_system": "Urinary System",
+        "medicinal_uses": "Dissolves kidney stones, acts as a diuretic, and treats urinary tract infections.",
+        "medicine_content": "Canthin-6-one, Flavonoids, Alkaloids",
+        "diseases_cured": "Kidney Stones, UTI, Edema, Cough",
+        "age_restriction": "Safe for children > 5",
+        "gender_restriction": "None",
+        "pregnant_women_restriction": "Avoid (Diuretic effect)",
+        "toxicity_warning": "Safe in moderate doses.",
+        "mode_of_use": "Decoction (Tea) of whole plant",
+        "doses": "30-50ml decoction",
+        "procedure": "1. Wash the whole plant (including roots). 2. Crush slightly. 3. Boil in water until reduced to 1/4. 4. Filter and drink.",
+        
+        "quick_safety": {
+            "safe_skin": "YES",
+            "safe_eat": "YES",
+            "for_children": "YES",
+            "for_pregnant": "CAUTION",
+            "best_use_today": "Kidney Detox"
+        },
+        "practical_guide": [
+            {"problem": "Kidney Stones", "solution": "Drink 50ml plant decoction morning empty stomach."},
+            {"problem": "Urinary Infection", "solution": "Drink boiled water with plant extracts."}
+        ],
+        "safety_guide": {
+            "avoid_if": ["Pregnancy", "Severe Dehydration"],
+            "overuse_effects": ["excessive urination"]
+        },
+        "nature_properties": {
+            "taste": "Bitter/Pungent",
+            "body_effect": "Cooling",
+            "best_time": "Morning",
+            "best_season": "All",
+            "parts_used": "Whole Plant"
+        },
+        "cultivation_guide": {
+            "water": "Low",
+            "sunlight": "Full Sun",
+            "soil": "Sandy/Rocky",
+            "growth_speed": "Moderate",
+            "harvest_time": "3-4 months"
+        },
+        "farming_guide": {
+            "market_demand": "Moderate (Herbal Kidney formulations)",
+            "economic_benefits": "Used in various Ayurvedic kidney tone syrups.",
+            "best_harvest_season": "Summer (Flowering stage)",
+            "common_diseases": "Leaf spot",
+            "prevention_tips": "Avoid waterlogging."
+        },
+        "research_data": {
+            "botanical_morphology": "Perennial herb, white woolly spike flowers.",
+            "chemical_constituents": "Canthin-6-one alkaloids, tannins, flavonoids.",
+            "potential_research_areas": "Urolithiasis (Kidney stones), Diuretic activity.",
+            "distribution_status": "Common weed in tropical India, Sri Lanka."
+        },
+        "similar_plants": []
+    },
+
+    "Medicinal-Rose Apple": {
+        "scientific_name": "Syzygium jambos",
+        "common_name": "Rose Apple",
+        "local_name": "Gulab Jamun, Panneer Neral",
+        "family_name": "Myrtaceae",
+        "plant_description": "Medium tree with lanceolate leaves and fragrant rose-scented pale yellow fruits.",
+        "plant_type": "Tree",
+        "ideal_climate": "Tropical/Subtropical",
+        "native_location": "Southeast Asia",
+        "primary_body_system": "Digestive System",
+        "medicinal_uses": "Treats diarrhea, diabetes, and boosts liver health. Tonic for brain.",
+        "medicine_content": "Jambosine, Vitamin C, Polyphenols",
+        "diseases_cured": "Diarrhea, Diabetes, Liver issues, Fever",
+        "age_restriction": "None",
+        "gender_restriction": "None",
+        "pregnant_women_restriction": "Safe (Fruit)",
+        "toxicity_warning": "Seeds contain traces of cyanide (Do not eat seeds).",
+        "mode_of_use": "Fruit, Bark decoction",
+        "doses": "2-3 fruits or 10ml bark decoction",
+        "procedure": "1. Eat fresh fruit for digestion. 2. Boil bark/leaves for diarrhea relief.",
+        
+        "quick_safety": {
+            "safe_skin": "YES",
+            "safe_eat": "YES",
+            "for_children": "YES",
+            "for_pregnant": "YES",
+            "best_use_today": "Digestion & Cooling"
+        },
+        "practical_guide": [
+            {"problem": "Diarrhea", "solution": "Drink 10ml bark decoction."},
+            {"problem": "Diabetes", "solution": "Consume fruit or seed powder (carefully)."}
+        ],
+        "safety_guide": {
+            "avoid_if": ["Constipation (Bark only)"],
+            "overuse_effects": ["Constipation"]
+        },
+        "nature_properties": {
+            "taste": "Sweet/Astringent",
+            "body_effect": "Cooling",
+            "best_time": "Daytime",
+            "best_season": "Summer",
+            "parts_used": "Fruit, Bark"
+        },
+        "cultivation_guide": {
+            "water": "High",
+            "sunlight": "Full Sun",
+            "soil": "Loamy/Wet",
+            "growth_speed": "Slow",
+            "harvest_time": "4-5 years"
+        },
+        "farming_guide": {
+            "market_demand": "Moderate (Exotic Fruit)",
+            "economic_benefits": "Sold as fresh fruit, high local value.",
+            "best_harvest_season": "Summer/Monsoon",
+            "common_diseases": "Fruit Fly, Rust",
+            "prevention_tips": "Bagging fruits, neem oil spray."
+        },
+        "research_data": {
+            "botanical_morphology": "Medium tree, lanceolate opposite leaves, whitish stamens.",
+            "chemical_constituents": "Jambosine (alkaloid), Tannins, Flavonoids.",
+            "potential_research_areas": "Anti-diabetic, Antimicrobial.",
+            "distribution_status": "Native to Southeast Asia, widely naturalized."
+        },
+        "similar_plants": [
+            {"name": "Jamun", "status": "Edible (Dark purple)"}
+        ]
+    },
+
     "Ocimum tenuiflorum": {
          "scientific_name": "Ocimum tenuiflorum", 
          "common_name": "Holy Basil",
@@ -352,6 +525,19 @@ PLANT_DATABASE = {
             "growth_speed": "Moderate",
             "harvest_time": "3 months"
         },
+        "farming_guide": {
+            "market_demand": "High (Tea, Supplements, Oil)",
+            "economic_benefits": "High export potential for essential oils.",
+            "best_harvest_season": "All, best in Winter",
+            "common_diseases": "Powdery mildew, Root rot",
+            "prevention_tips": "Avoid overhead watering."
+        },
+        "research_data": {
+            "botanical_morphology": "Erect, much branched subshrub, simple opposite leaves.",
+            "chemical_constituents": "Eugenol, Carvacrol, Ursolic acid.",
+            "potential_research_areas": "Anti-stress, Radioprotective, Anti-viral.",
+            "distribution_status": "Native to Indian subcontinent."
+        },
         "similar_plants": [
             {"name": "Thai Basil", "status": "Edible"}
         ]
@@ -359,26 +545,27 @@ PLANT_DATABASE = {
 }
 
 GENERIC_FALLBACK = {
-    "scientific_name": "Unknown Species",
-    "family_name": "Unknown Family",
-    "medicine_content": "Information unavailable offline",
-    "medicinal_uses": "Specific medicinal uses not found in offline database.",
+    "scientific_name": "Not Available",
+    "family_name": "Not Available",
+    "medicine_content": "Information not available.",
+    "medicinal_uses": "This plant is not currently in our medicinal database.",
     
     # --- Card Data Keys ---
-    "common_name": "Unknown",
-    "local_name": "Unknown",
-    "native_location": "Native region information unavailable",
-    "diseases_cured": "Various general ailments",
+    "name": "Unknown Plant",
+    "common_name": "Unknown Plant",
+    "local_name": "Not Available",
+    "native_location": "Not Available",
+    "diseases_cured": "Information not available",
     "mode_of_use": "Consult a local herbalist",
     "doses": "Do not consume without advice",
-    "procedure": "No standard procedure available offline.",
+    "procedure": "No information available.",
     "age_restriction": "Consult a doctor",
     "gender_restriction": "None",
     "toxicity_warning": "Consult expert before use.",
-    "plant_description": "Green medicinal plant.",
-    "plant_type": "Herb/Shrub",
-    "ideal_climate": "Tropical",
-    "primary_body_system": "General Health",
+    "plant_description": "We do not have information on this plant.",
+    "plant_type": "Unknown",
+    "ideal_climate": "Unknown",
+    "primary_body_system": "Unknown",
     # ----------------------
 
     "quick_safety": {
@@ -390,49 +577,46 @@ GENERIC_FALLBACK = {
     },
     
     "practical_guide": [
-        {"problem": "General Health", "solution": "Consult a local herbalist"},
-        {"problem": "Skin Issues", "solution": "Patch test before application"}
+        {"problem": "Info Not Found", "solution": "Please try scanning a supported medicinal plant."}
     ],
     
     "safety_guide": {
         "avoid_if": ["Pregnant women", "Infants", "Severe illness"],
-        "overuse_effects": ["Nausea", "Allergic reaction"]
+        "overuse_effects": ["Unknown"]
     },
     
     "nature_properties": {
         "taste": "Unknown",
         "body_effect": "Unknown",
-        "best_time": "Daytime",
-        "best_season": "All",
-        "parts_used": "Leaves (General)"
+        "best_time": "Unknown",
+        "best_season": "Unknown",
+        "parts_used": "Unknown"
     },
 
     "cultivation_guide": {
-        "water": "Moderate",
-        "sunlight": "Partial Shade",
-        "soil": "Well-drained",
-        "growth_speed": "Average",
-        "harvest_time": "Year-round"
+        "water": "Unknown",
+        "sunlight": "Unknown",
+        "soil": "Unknown",
+        "growth_speed": "Unknown",
+        "harvest_time": "Unknown"
     },
 
     "farming_guide": {
-        "market_demand": "Moderate local demand",
-        "economic_benefits": "Local sale, home use",
-        "best_harvest_season": "Year-round",
-        "common_diseases": "Fungal spots, Root rot",
-        "prevention_tips": "Avoid waterlogging, ensure air circulation"
+        "market_demand": "Unknown",
+        "economic_benefits": "Unknown",
+        "best_harvest_season": "Unknown",
+        "common_diseases": "Unknown",
+        "prevention_tips": "Unknown"
     },
 
     "research_data": {
-        "botanical_morphology": "Standard green leafy plant structure.",
-        "chemical_constituents": "Basic phytochemicals (flavonoids, tannins)",
-        "potential_research_areas": "General medicinal properties",
-        "distribution_status": "Widely distributed"
+        "botanical_morphology": "Data not available",
+        "chemical_constituents": "Data not available",
+        "potential_research_areas": "Data not available",
+        "distribution_status": "Data not available"
     },
 
-    "similar_plants": [
-        {"name": "No lookalikes found", "status": "Unknown"}
-    ]
+    "similar_plants": []
 }
 
 

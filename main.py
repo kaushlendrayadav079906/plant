@@ -82,8 +82,34 @@ except Exception as e:
     gemini_chat_model = None
 
 # --- 3. HELPER FUNCTION TO GET INFO FROM GEMINI ---
+# --- 3. HELPER FUNCTION TO GET INFO FROM GEMINI ---
+CACHE_FILE = "plant_cache.json"
+
+def load_cache():
+    if os.path.exists(CACHE_FILE):
+        try:
+            with open(CACHE_FILE, "r") as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+def save_cache(cache_data):
+    try:
+        with open(CACHE_FILE, "w") as f:
+            json.dump(cache_data, f, indent=4)
+    except Exception as e:
+        print(f"Error saving cache: {e}")
+
 def get_plant_info_from_gemini(plant_name: str):
     """Asks the Gemini API for details and expects a JSON response."""
+    
+    # 1. Check Cache first
+    cache = load_cache()
+    if plant_name in cache:
+        print(f"✅ Found {plant_name} in local cache. Skipping API call.")
+        return cache[plant_name]
+
     if not gemini_data_model:
         return {"error": "Gemini data model not initialized."}
         
@@ -95,12 +121,15 @@ def get_plant_info_from_gemini(plant_name: str):
 
     prompt = f"""
     You are an expert botanist and ayurvedic practitioner. 
-    Your goal is to provide HIGHLY DETAILED, PRACTICAL, and ENGAGING information for the plant named '{search_name}' (Scientific Name: {search_name}).
+    Your goal is to provide HIGHLY ACCURATE, VERIFIED, and SCIENTIFIC information for the plant named '{search_name}' (Scientific Name: {search_name}).
     
+    IMPORTANT: The user will verify this information on Google. It MUST be 100% correct. DO NOT HALLUCINATE.
+    If a specific detail is not scientifically known or common knowledge, put "Unknown" instead of making it up.
+
     The response MUST be in strictly valid JSON format with these exact keys:
 
     1. "name": "{search_name}"
-    2. "scientific_name": (string) Latin name.
+    2. "scientific_name": (string) Latin name. MUST BE ACCURATE.
     3. "common_name": (string) Most popular English name.
     4. "local_name": (string) Common local Indian/Asian names.
     5. "family_name": (string) Botanical family.
@@ -179,9 +208,9 @@ def get_plant_info_from_gemini(plant_name: str):
     ]
 
     CRITICAL INSTRUCTIONS:
-    - Do NOT return "N/A" or "Consult Expert". Use your general botanical knowledge to provide standard traditional practices.
+    - Do NOT return "N/A" or "Consult Expert" unless strictly necessary. However, accuracy is paramount.
+    - If the plant is NOT a known medicinal plant, fill the fields with "This is not a recognized medicinal plant."
     - Be clear, safe, and helpful.
-    - If specific details are missing, provide the most common general knowledge for this species.
     """
     try:
         response = gemini_data_model.generate_content(prompt)
@@ -197,6 +226,12 @@ def get_plant_info_from_gemini(plant_name: str):
 
         data = json.loads(clean_json_text)
         data['name'] = plant_name # Add the original name for convenience
+        
+        # Save success to cache
+        cache = load_cache()
+        cache[plant_name] = data
+        save_cache(cache)
+        
         return data
     except Exception as e:
         logging.error(f"Gemini API Error for {plant_name}: {e}")
@@ -204,8 +239,13 @@ def get_plant_info_from_gemini(plant_name: str):
         
         # Use local database instead of failing
         local_data = get_fallback_data(plant_name)
-        local_data['error'] = "Notice: Using offline data due to API limit."
+        
+        # If the local data is the Generic/Unknown one, we mark it significantly
+        if local_data.get("scientific_name") == "Not Available":
+             local_data['error'] = "Plant info not found in database or online."
+        
         return local_data
+
 
 # --- 4. CREATE THE FASTAPI APP ---
 app = FastAPI(
@@ -214,8 +254,25 @@ app = FastAPI(
 )
 
 # --- 4.1 SEARCH HISTORY STORAGE ---
-# Simple in-memory storage. For production, use a database (SQLite/PostgreSQL).
-SEARCH_HISTORY = []
+HISTORY_FILE = "history.json"
+
+def load_history():
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, "r") as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def save_history_to_file(history_data):
+    try:
+        with open(HISTORY_FILE, "w") as f:
+            json.dump(history_data, f, indent=4)
+    except Exception as e:
+        print(f"Error saving history: {e}")
+
+SEARCH_HISTORY = load_history()
 
 def save_to_history(plant_name, date_time, confidence=None):
     entry = {
@@ -226,6 +283,41 @@ def save_to_history(plant_name, date_time, confidence=None):
     SEARCH_HISTORY.insert(0, entry) # Add to beginning
     if len(SEARCH_HISTORY) > 50:
         SEARCH_HISTORY.pop()
+    save_history_to_file(SEARCH_HISTORY)
+
+@app.get("/history")
+async def get_history():
+    """Returns the search history."""
+    return {"history": SEARCH_HISTORY}
+
+@app.delete("/history")
+async def clear_history():
+    """Clears all history."""
+    global SEARCH_HISTORY
+    SEARCH_HISTORY = []
+    save_history_to_file(SEARCH_HISTORY)
+    return {"message": "History cleared"}
+
+@app.delete("/history/{index}")
+async def delete_history_item(index: int):
+    """Deletes a specific history item."""
+    try:
+        # Check bounds
+        if 0 <= index < len(SEARCH_HISTORY):
+            removed = SEARCH_HISTORY.pop(index)
+            save_history_to_file(SEARCH_HISTORY)
+            return {"message": f"Deleted {removed['plant_name']}"}
+        else:
+             raise HTTPException(status_code=404, detail="Item not found")
+    except Exception as e:
+         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/plant_details/{name}")
+async def get_plant_details(name: str):
+    """Get full plant details by name (cached or new)."""
+    # Use existing helper which handles API+Cache+Fallback
+    data = get_plant_info_from_gemini(name)
+    return data
 
 # --- 5. CONFIGURE CORS (This is the connection!) ---
 # This allows your React frontend (on http://localhost:5173) 
@@ -282,7 +374,8 @@ async def predict_plant(file: UploadFile = File(...)):
             
         # --- Run YOLO detection ---
         print("Running YOLO detection...")
-        results = yolo_model(pil_image)
+        # Increase confidence threshold to avoid false positives (e.g., 0.5)
+        results = yolo_model(pil_image, conf=0.5)
         if not results:
              raise Exception("YOLO model returned no results.")
         r = results[0]
@@ -368,16 +461,51 @@ async def chat_with_bot(request: ChatRequest):
         plant_data = get_fallback_data(request.plant_name)
         
         # Check if we found real data (not the default "Unknown" fallback)
-        if plant_data["scientific_name"] != "Unknown (Database Pending)" and request.plant_name.lower() != "your plant":
-             fallback_response = (
-                f"I can't reach my AI cloud at the moment (Quota Limit), but I have this information in my local records:\n\n"
-                f"🌿 **Plant Name:** {request.plant_name}\n"
-                f"🔬 **Scientific Name:** {plant_data['scientific_name']}\n"
-                f"👪 **Family:** {plant_data['family_name']}\n"
-                f"💊 **Medicinal Uses:** {plant_data['medicinal_uses']}\n\n"
-                "If you need more details, try again in a minute!"
-            )
-             return {"response": fallback_response}
+        # Check if we found real data (not the default "Unknown" fallback)
+        # Note: GENERIC_FALLBACK sets scientific_name to "Not Available"
+        if plant_data.get("scientific_name") != "Not Available" and request.plant_name.lower() != "your plant":
+             
+             # --- SMART OFFLINE RESPONSE ---
+             # Try to guess what the user is asking about
+             msg = request.message.lower()
+             response_text = ""
+             
+             # 1. Name / Identity
+             if any(x in msg for x in ["name", "called", "identify", "what is this", "who is this"]):
+                 response_text = (
+                     f"🌿 **Plant Name:** {request.plant_name}\n"
+                     f"🔬 **Scientific Name:** {plant_data.get('scientific_name')}\n"
+                     f"👪 **Family:** {plant_data.get('family_name')}"
+                 )
+
+             # 2. Uses / Benefits
+             elif any(x in msg for x in ["use", "benefit", "good for", "cure", "treat", "heal"]):
+                 response_text = f"🌿 **Medicinal Uses:** {plant_data.get('medicinal_uses', 'Information not available.')}\n\nDiseases: {plant_data.get('diseases_cured', '')}"
+             
+             # 3. Safety / Toxicity
+             elif any(x in msg for x in ["safe", "side effect", "warn", "toxic", "poison", "danger"]):
+                 response_text = f"⚠️ **Safety Guide:**\n{plant_data.get('safety_guide', {}).get('overuse_effects', ['Consult a doctor.'])}\nToxicity: {plant_data.get('toxicity_warning', 'Unknown')}"
+                 
+             # 4. Preparation / Dosage
+             elif any(x in msg for x in ["eat", "consume", "dose", "dosage", "how to take", "prepare", "recipe", "cook"]):
+                 response_text = f"🥣 **How to Use:** {plant_data.get('mode_of_use', '')}\n\n**Common Doses:** {plant_data.get('doses', '')}\n\n**Procedure:** {plant_data.get('procedure', '')}"
+            
+             # 5. Cultivation (Removed generic 'plant' keyword)
+             elif any(x in msg for x in ["grow", "water", "soil", "sun", "farm", "garden"]):
+                 cult = plant_data.get('cultivation_guide', {})
+                 response_text = f"🌱 **Cultivation:**\nWater: {cult.get('water')}\nSun: {cult.get('sunlight')}\nSoil: {cult.get('soil')}"
+
+             else:
+                 # Default summary if no keywords match
+                 response_text = (
+                    f"I'm operating in **Offline Mode** (AI Quota Limit), but here is what I know:\n\n"
+                    f"🌿 **Plant:** {request.plant_name} ({plant_data.get('scientific_name')})\n"
+                    f"💊 **Main Use:** {plant_data.get('medicinal_uses')}\n"
+                    f"⚠️ **Safety:** {plant_data.get('toxicity_warning')}\n\n"
+                    "Ask me specifically about 'uses', 'dosage', 'safety', or 'growing'!"
+                )
+
+             return {"response": response_text}
         else:
             # If we really don't know anything
             return {"response": f"I don't have information about '{request.plant_name}' right now. Please try uploading the image again or ask about a specific plant."}
