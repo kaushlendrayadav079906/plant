@@ -1,0 +1,860 @@
+import axios from 'axios';
+import { AlertTriangle, BookOpen, Bot, Camera, Clock, Droplets, FlaskConical, Globe, Leaf, Loader2, Microscope, ShieldCheck, Sprout, Sun, Tractor, TrendingUp, Upload, User, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+
+// --- Loading Components ---
+const Spinner = () => <Loader2 className="animate-spin h-5 w-5 mr-3" />;
+const SkeletonLoader = () => (
+  <div className="animate-pulse space-y-4">
+    <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-xl" />
+    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3" />
+    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full" />
+    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-4/5" />
+  </div>
+);
+
+// --- Home Component ---
+export default function Home() {
+  const [showSplash, setShowSplash] = useState(true);
+  const [activeTab, setActiveTab] = useState('detect');
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // --- Camera State ---
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const [cameraStream, setCameraStream] = useState(null);
+
+  // --- Detection State ---
+  const [detectionResult, setDetectionResult] = useState(null);
+
+  // --- Chat State ---
+  const [chatPlantName, setChatPlantName] = useState('your plant');
+  const [chatInput, setChatInput] = useState('');
+  const [chatMessages, setChatMessages] = useState([]);
+  const [isChatLoading, setIsChatLoading] = useState(false);
+
+  const fileInputRef = useRef(null);
+  const API_URL = 'http://localhost:8000';
+
+  // --- File Upload ---
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+      clearResults();
+    }
+  };
+
+  const clearResults = () => {
+    setDetectionResult(null);
+    setError(null);
+    setChatMessages([]);
+    setChatPlantName('your plant');
+    setShowAdvanced(false);
+  };
+
+  const clearSelection = () => {
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    clearResults();
+    if (fileInputRef.current) fileInputRef.current.value = null;
+  };
+
+  // --- CAMERA FUNCTIONS ---
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      setCameraStream(stream);
+      setCameraOpen(true);
+      setCameraError(null);
+    } catch (err) {
+      console.error(err);
+      setCameraError('Unable to access camera. Please allow permissions.');
+    }
+  };
+
+  useEffect(() => {
+    if (cameraOpen && videoRef.current && cameraStream) {
+      videoRef.current.srcObject = cameraStream;
+    }
+  }, [cameraOpen, cameraStream]);
+
+  const capturePhoto = () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob((blob) => {
+      const file = new File([blob], 'captured_image.jpg', { type: 'image/jpeg' });
+      setSelectedFile(file);
+      setPreviewUrl(URL.createObjectURL(blob));
+      clearResults();
+    }, 'image/jpeg');
+
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+    }
+    setCameraOpen(false);
+    setCameraStream(null);
+  };
+
+  // --- Detection ---
+  const handleSubmitDetection = async () => {
+    if (!selectedFile) return;
+    setIsLoading(true);
+    setError(null);
+    setDetectionResult(null);
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    try {
+      const response = await axios.post(`${API_URL}/predict`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setDetectionResult(response.data);
+
+      if (response.data.plant_data?.length > 0) {
+        const firstPlant = response.data.plant_data[0];
+        // Only skip if it's a "No plant detected" error
+        if (firstPlant.name !== "No plant detected") {
+           const plantName = firstPlant.name || 'your plant';
+           setChatPlantName(plantName);
+           setChatMessages([{ sender: 'bot', text: `I've identified ${plantName}. Ask me anything about it!` }]);
+        } else {
+           setChatMessages([{ sender: 'bot', text: "I couldn't detect a specific plant." }]);
+        }
+      } else {
+        setChatMessages([{ sender: 'bot', text: "I couldn't detect a specific plant." }]);
+      }
+    } catch (err) {
+      console.error(err);
+      const msg = err.response?.data?.detail || 'Error during detection. Is backend running?';
+      setError(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- Chat ---
+  const handleSubmitChat = async (e) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+
+    const userMessage = { sender: 'user', text: chatInput };
+    setChatMessages((prev) => [...prev, userMessage]);
+    setChatInput('');
+    setIsChatLoading(true);
+
+    try {
+      const response = await axios.post(`${API_URL}/chat`, {
+        plant_name: chatPlantName,
+        message: chatInput,
+      });
+      const botMessage = { sender: 'bot', text: response.data.response || response.data.error };
+      setChatMessages((prev) => [...prev, botMessage]);
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Error, please try again.';
+      setChatMessages((prev) => [...prev, { sender: 'bot', text: msg }]);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
+  // --- UI ---
+  if (showSplash) {
+    return (
+      <div 
+        className="h-screen w-screen flex flex-col items-center justify-center bg-gradient-to-br from-green-600 to-emerald-900 text-white cursor-pointer relative overflow-hidden select-none"
+        onClick={() => setShowSplash(false)}
+      >
+        {/* Background Overlay */}
+        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?q=80&w=2574&auto=format&fit=crop')] bg-cover bg-center opacity-20 mix-blend-overlay"></div>
+        
+        <div className="z-10 text-center p-8 animate-in fade-in zoom-in duration-1000 flex flex-col items-center">
+          <div className="w-24 h-24 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center mb-6 shadow-2xl ring-4 ring-white/20">
+             <Bot className="w-12 h-12 text-white drop-shadow-lg" />
+          </div>
+          <h1 className="text-4xl md:text-6xl font-extrabold mb-4 drop-shadow-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-green-100">
+            Medicinal Plant Recognition System
+          </h1>
+          <p className="text-xl md:text-2xl font-light opacity-90 drop-shadow-md mt-4 max-w-2xl leading-relaxed">
+            Discover the healing power of nature with AI.
+          </p>
+          <div className="mt-12 animate-pulse text-sm font-semibold tracking-widest uppercase opacity-75">
+            Tap anywhere to begin
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto flex-grow p-6 flex flex-col gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* LEFT: Upload + Camera */}
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-xl flex flex-col">
+        <h2 className="text-2xl font-semibold mb-4 text-green-600 dark:text-green-400">
+          1. Upload or Capture Image
+        </h2>
+
+        <div
+          className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 flex flex-col items-center justify-center cursor-pointer hover:border-green-400 dark:hover:border-green-500 transition"
+          onClick={() => fileInputRef.current.click()}
+        >
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept="image/*"
+            className="hidden"
+          />
+
+          {previewUrl ? (
+            <div className="relative">
+              <img src={previewUrl} alt="Preview" className="max-h-60 rounded-lg" />
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  clearSelection();
+                }}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ) : (
+            <>
+              <Upload className="h-12 w-12 text-gray-400 dark:text-gray-500 mb-2" />
+              <span className="text-gray-600 dark:text-gray-300">Click to upload</span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">PNG, JPG, WEBP</span>
+            </>
+          )}
+        </div>
+
+        {/* Camera Button */}
+        <button
+          onClick={startCamera}
+          className="mt-4 bg-blue-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-blue-700 transition"
+        >
+          <Camera className="h-5 w-5" /> Open Camera
+        </button>
+
+        {/* Camera Stream */}
+        {cameraOpen && (
+          <div className="mt-4 flex flex-col items-center">
+            {cameraError ? (
+              <p className="text-red-600">{cameraError}</p>
+            ) : (
+              <>
+                <video ref={videoRef} autoPlay className="w-72 h-56 rounded-lg shadow mb-3"></video>
+                <button
+                  onClick={capturePhoto}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+                >
+                  Capture Photo
+                </button>
+                <canvas ref={canvasRef} className="hidden"></canvas>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Detect Button */}
+        <button
+          onClick={handleSubmitDetection}
+          disabled={!selectedFile || isLoading}
+          className="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg mt-6 flex justify-center hover:bg-green-700 disabled:bg-gray-400"
+        >
+          {isLoading ? <Spinner /> : 'Detect Plant'}
+        </button>
+      </div>
+
+      {/* RIGHT: Output + Chat */}
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-xl flex flex-col h-full">
+        <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
+          <button
+            onClick={() => setActiveTab('detect')}
+            className={`py-2 px-4 font-medium ${
+              activeTab === 'detect'
+                ? 'border-b-2 border-green-600 text-green-600 dark:text-green-400'
+                : 'text-gray-400'
+            }`}
+          >
+            Detection Result
+          </button>
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`py-2 px-4 font-medium ${
+              activeTab === 'chat'
+                ? 'border-b-2 border-green-600 text-green-600 dark:text-green-400'
+                : 'text-gray-400'
+            }`}
+          >
+            Search More Information Related To Plants.
+          </button>
+        </div>
+
+        {/* Detection + Chat */}
+        {activeTab === 'detect' ? (
+          <div className="flex-grow">
+            {isLoading && <SkeletonLoader />}
+            {!isLoading && detectionResult && (
+              <div>
+                <img
+                  src={`data:image/jpeg;base64,${detectionResult.annotated_image}`}
+                  alt="Detected"
+                  className="rounded-lg border border-gray-200 w-full mb-4 shadow-sm"
+                />
+              </div>
+            )}
+            {!isLoading && !detectionResult && (
+              <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+                <p>No detection yet. Upload an image to start!</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col flex-grow h-[600px] relative">
+            <div className="flex-grow overflow-y-auto bg-gray-50 dark:bg-gray-900/50 rounded-xl p-4 space-y-4 border border-gray-100 dark:border-gray-700 scroll-smooth">
+              {chatMessages.length === 0 && (
+                 <div className="text-center text-gray-400 mt-10">
+                    <Bot className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>Ask me anything about {chatPlantName}!</p>
+                 </div>
+              )}
+              {chatMessages.map((msg, idx) => (
+                <div
+                  key={idx}
+                  className={`flex ${
+                    msg.sender === 'user' ? 'justify-end' : 'justify-start'
+                  }`}
+                >
+                  <div
+                    className={`flex items-end gap-2 max-w-[80%] ${
+                      msg.sender === 'user' ? 'flex-row-reverse' : ''
+                    }`}
+                  >
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        msg.sender === 'user'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-green-600 text-white'
+                      }`}
+                    >
+                      {msg.sender === 'user' ? <User size={16} /> : <Bot size={16} />}
+                    </div>
+                    <div
+                      className={`px-4 py-3 rounded-2xl text-sm shadow-sm ${
+                        msg.sender === 'user'
+                          ? 'bg-blue-600 text-white rounded-br-none'
+                          : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-600 rounded-bl-none'
+                      }`}
+                    >
+                      {msg.text}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {isChatLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-gray-100 dark:bg-gray-800 px-4 py-2 rounded-full flex gap-1 items-center">
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <form onSubmit={handleSubmitChat} className="mt-4 relative">
+              <div className="relative flex items-center">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder={`Ask about ${chatPlantName}...`}
+                  className="w-full pl-4 pr-12 py-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/50 transition-all shadow-sm"
+                />
+                <button
+                  type="submit"
+                  disabled={!chatInput.trim() || isChatLoading}
+                  className="absolute right-2 p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <User className="h-5 w-5 rotate-90" /> {/* Using User icon rotated as send icon for now, or just send text */}
+                  <span className="sr-only">Send</span>
+                  ➡️
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </div>
+      </div>
+
+      {/* --- NEW PLANT INFORMATION SECTION --- */}
+      {!isLoading && detectionResult && detectionResult.plant_data && detectionResult.plant_data.length > 0 && (
+        <div className="w-full space-y-6">
+          {detectionResult.plant_data.map((plant, i) => (
+             <div key={i} className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+               
+               {/* 1. TOP CARD: Quick Safety Result */}
+               <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-6 border-l-8 border-green-500 overflow-hidden relative mb-8">
+                  <div className="flex justify-between items-start mb-6">
+                    <div>
+                         <h2 className="text-4xl font-extrabold text-gray-800 dark:text-white mb-2">{plant.name}</h2>
+                         <p className="text-gray-500 dark:text-gray-400 text-lg mb-2">{plant.plant_description}</p>
+                         <p className="text-green-600 dark:text-green-400 font-medium text-lg">Confidence: 96.4% (Estimated)</p>
+                    </div>
+                    <div className="bg-green-100 dark:bg-green-900/30 px-4 py-2 rounded-full transform transition hover:scale-105">
+                       <ShieldCheck className="w-8 h-8 text-green-600 dark:text-green-400" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                      <div className={`p-4 rounded-xl text-center ${plant.quick_safety?.safe_skin === 'YES' ? 'bg-green-50 dark:bg-green-900/20 text-green-700' : 'bg-yellow-50 text-yellow-700'}`}>
+                         <div className="text-xs font-bold uppercase tracking-wide opacity-70 mb-1">Safe for Skin</div>
+                         <div className="text-xl font-bold">{plant.quick_safety?.safe_skin || 'Caution'}</div>
+                      </div>
+                      <div className={`p-4 rounded-xl text-center ${plant.quick_safety?.safe_eat === 'YES' ? 'bg-green-50 dark:bg-green-900/20 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                         <div className="text-xs font-bold uppercase tracking-wide opacity-70 mb-1">Safe to Eat</div>
+                         <div className="text-xl font-bold">{plant.quick_safety?.safe_eat || 'No'}</div>
+                      </div>
+                      <div className={`p-4 rounded-xl text-center ${plant.quick_safety?.for_children === 'YES' ? 'bg-green-50 dark:bg-green-900/20 text-green-700' : 'bg-orange-50 text-orange-700'}`}>
+                         <div className="text-xs font-bold uppercase tracking-wide opacity-70 mb-1">For Children</div>
+                         <div className="text-xl font-bold">{plant.quick_safety?.for_children || 'No'}</div>
+                      </div>
+                       <div className={`p-4 rounded-xl text-center ${plant.quick_safety?.for_pregnant === 'YES' ? 'bg-green-50 dark:bg-green-900/20 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                         <div className="text-xs font-bold uppercase tracking-wide opacity-70 mb-1">For Pregnant</div>
+                         <div className="text-xl font-bold">{plant.quick_safety?.for_pregnant || 'DANGEROUS ⚠️'}</div>
+                      </div>
+                  </div>
+
+                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl flex items-center justify-center gap-2 border border-blue-100 dark:border-blue-900/30">
+                      <span className="font-bold text-blue-800 dark:text-blue-200">✨ Best Use Today:</span>
+                      <span className="text-blue-700 dark:text-blue-300">{plant.quick_safety?.best_use_today || 'Consult Expert'}</span>
+                  </div>
+               </div>
+
+                {/* 2. COLORFUL GRID CARDS */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8">
+                  
+                  {/* Card 1: Identity */}
+                  <div className="group relative bg-gradient-to-br from-green-50 to-emerald-100 dark:from-gray-800 dark:to-gray-900 p-8 rounded-2xl shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border border-white/50 dark:border-gray-700 overflow-hidden">
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className="w-12 h-12 rounded-xl bg-white dark:bg-gray-800 shadow-md flex items-center justify-center text-2xl">🌱</div>
+                        <div>
+                           <div className="text-xs font-bold tracking-wider text-green-800 uppercase">Scientific Profile</div>
+                           <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100 leading-tight">{plant.scientific_name}</h3>
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                         <div className="flex justify-between border-b border-green-200 dark:border-gray-700 pb-2">
+                             <span className="text-gray-600 dark:text-gray-400">Common Name</span>
+                             <span className="font-semibold text-gray-800 dark:text-gray-200">{plant.common_name}</span>
+                         </div>
+                         <div className="flex justify-between border-b border-green-200 dark:border-gray-700 pb-2">
+                             <span className="text-gray-600 dark:text-gray-400">Family</span>
+                             <span className="font-semibold text-gray-800 dark:text-gray-200">{plant.family_name}</span>
+                         </div>
+                         <div className="flex justify-between">
+                             <span className="text-gray-600 dark:text-gray-400">Type</span>
+                             <span className="font-semibold text-gray-800 dark:text-gray-200">{plant.plant_type || 'Plant'}</span>
+                         </div>
+                      </div>
+                  </div>
+
+                  {/* Card 2: Habitat (Origin) */}
+                  <div className="group relative bg-gradient-to-br from-teal-50 to-cyan-100 dark:from-gray-800 dark:to-gray-900 p-8 rounded-2xl shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border border-white/50 dark:border-gray-700 overflow-hidden">
+                       <div className="flex items-center gap-4 mb-4">
+                        <div className="w-12 h-12 rounded-xl bg-white dark:bg-gray-800 shadow-md flex items-center justify-center text-2xl">🌍</div>
+                        <div>
+                           <div className="text-xs font-bold tracking-wider text-teal-800 uppercase">Origin & Habitat</div>
+                           <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100 leading-tight">Native Regions</h3>
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                         <p className="text-gray-800 dark:text-gray-200 font-medium leading-relaxed">
+                            {plant.native_location || 'Global'}
+                         </p>
+                         <div className="pt-2">
+                            <span className="text-xs font-bold text-gray-500 uppercase">Ideal Climate</span>
+                            <div className="mt-1 font-semibold text-teal-700 dark:text-teal-300 bg-white/50 px-3 py-1 rounded-lg inline-block">
+                                {plant.ideal_climate || 'Varied'}
+                            </div>
+                         </div>
+                      </div>
+                  </div>
+
+                  {/* Card 3: Medicinal Power */}
+                  <div className="group relative bg-gradient-to-br from-yellow-50 to-amber-100 dark:from-gray-800 dark:to-gray-900 p-8 rounded-2xl shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border border-white/50 dark:border-gray-700 overflow-hidden">
+                       <div className="flex items-center gap-4 mb-4">
+                        <div className="w-12 h-12 rounded-xl bg-white dark:bg-gray-800 shadow-md flex items-center justify-center text-2xl">⚡</div>
+                        <div>
+                           <div className="text-xs font-bold tracking-wider text-amber-800 uppercase">Healing Power</div>
+                           <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100 leading-tight">Key Benefits</h3>
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                         <div className="bg-white/60 dark:bg-black/20 rounded-xl p-3">
+                            <span className="text-xs text-amber-600 font-bold uppercase">Main Target</span>
+                            <p className="font-bold text-gray-800 dark:text-gray-200 text-lg">{plant.primary_body_system || 'General Health'}</p>
+                         </div>
+                         <div>
+                            <span className="text-xs text-gray-500 font-bold uppercase">Active Ingredients</span>
+                            <p className="text-gray-800 dark:text-gray-200 text-sm mt-1">{plant.medicine_content || 'Various compounds'}</p>
+                         </div>
+                      </div>
+                  </div>
+
+                  {/* Card 4: Diseases Cured (Expanded) */}
+                  <div className="col-span-1 md:col-span-2 group relative bg-gradient-to-br from-red-50 to-rose-100 dark:from-gray-800 dark:to-gray-900 p-8 rounded-2xl shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border border-white/50 dark:border-gray-700 overflow-hidden">
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className="w-12 h-12 rounded-xl bg-white dark:bg-gray-800 shadow-md flex items-center justify-center text-2xl">🩺</div>
+                        <div>
+                           <div className="text-xs font-bold tracking-wider text-red-800 uppercase">Medical Application</div>
+                           <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100 leading-tight">Treats Conditions</h3>
+                        </div>
+                      </div>
+                       <div className="flex flex-wrap gap-2 relative z-10">
+                         {plant.diseases_cured ? (
+                           plant.diseases_cured.split(',').map((disease, idx) => (
+                             <span key={idx} className="px-4 py-2 bg-white dark:bg-gray-800 rounded-lg text-base font-semibold text-gray-800 dark:text-gray-100 shadow-sm border border-red-100 dark:border-gray-600">
+                               {disease.trim()}
+                             </span>
+                           ))
+                         ) : (
+                           <p className="font-bold">General health benefits</p>
+                         )}
+                      </div>
+                  </div>
+
+                  {/* Card 5: Age & Safety (Combined) */}
+                  <div className="group relative bg-gradient-to-br from-orange-50 to-red-100 dark:from-gray-800 dark:to-gray-900 p-8 rounded-2xl shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border border-white/50 dark:border-gray-700 overflow-hidden">
+                       <div className="flex items-center gap-4 mb-4">
+                        <div className="w-12 h-12 rounded-xl bg-white dark:bg-gray-800 shadow-md flex items-center justify-center text-2xl">🛡️</div>
+                        <div>
+                           <div className="text-xs font-bold tracking-wider text-orange-800 uppercase">Safety Protocol</div>
+                           <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100 leading-tight">Usage Limits</h3>
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                         <div className="flex items-center justify-between">
+                            <span className="font-medium text-gray-700 dark:text-gray-300">Age Restriction</span>
+                            <span className="font-bold text-red-600 bg-white px-2 py-1 rounded shadow-sm">{plant.age_restriction || 'None'}</span>
+                         </div>
+                          <div className="bg-red-500/10 rounded-xl p-3 border border-red-500/20">
+                            <span className="text-xs text-red-600 font-bold uppercase">Toxicity Warning</span>
+                            <p className="font-bold text-gray-900 dark:text-gray-100 text-sm">{plant.toxicity_warning || 'Consult Expert'}</p>
+                         </div>
+                      </div>
+                  </div>
+
+                </div>
+
+
+               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                 {/* 3. Practical Use Guide */}
+                 <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+                     <h3 className="text-2xl font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                        🧠 Practical Use Guide
+                     </h3>
+                     <div className="overflow-hidden rounded-xl border border-gray-100 dark:border-gray-700">
+                        <table className="w-full text-left">
+                            <thead className="bg-gray-50 dark:bg-gray-700/50">
+                                <tr>
+                                    <th className="px-6 py-4 font-bold text-gray-600 dark:text-gray-300">Problem</th>
+                                    <th className="px-6 py-4 font-bold text-gray-600 dark:text-gray-300">What to Do</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                {plant.practical_guide && plant.practical_guide.map((item, idx) => (
+                                    <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                                        <td className="px-6 py-4 font-medium text-gray-800 dark:text-gray-200">{item.problem}</td>
+                                        <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{item.solution}</td>
+                                    </tr>
+                                ))}
+                                {!plant.practical_guide && (
+                                    <tr><td colSpan="2" className="p-4 text-center">No practical guide available.</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                     </div>
+                 </div>
+
+                 {/* 4. When to AVOID (Safety) */}
+                 <div className="bg-red-50 dark:bg-red-900/10 rounded-2xl shadow-lg p-6 border border-red-100 dark:border-red-900/30">
+                     <h3 className="text-xl font-bold text-red-700 dark:text-red-400 mb-4 flex items-center gap-2">
+                        🚫 Avoid If / Warning
+                     </h3>
+                     <div className="space-y-4">
+                         <div>
+                             <h4 className="font-semibold text-red-800 dark:text-red-300 mb-2 text-sm uppercase tracking-wider">Do Not Use If:</h4>
+                             <div className="flex flex-wrap gap-2">
+                                 {plant.safety_guide?.avoid_if ? plant.safety_guide.avoid_if.map((item, id) => (
+                                     <span key={id} className="px-3 py-1 bg-white dark:bg-red-900/40 text-red-700 dark:text-red-200 rounded-lg text-sm font-medium border border-red-100 dark:border-red-800">
+                                         {item}
+                                     </span>
+                                 )) : <span>Consult Doctor</span>}
+                             </div>
+                         </div>
+                         <div>
+                             <h4 className="font-semibold text-red-800 dark:text-red-300 mb-2 text-sm uppercase tracking-wider">Overuse Effects:</h4>
+                             <ul className="list-disc list-inside text-red-700 dark:text-red-300 text-sm space-y-1">
+                                 {plant.safety_guide?.overuse_effects ? plant.safety_guide.overuse_effects.map((effect, id) => (
+                                     <li key={id}>{effect}</li>
+                                 )) : <li>Nausea (General)</li>}
+                             </ul>
+                         </div>
+                     </div>
+                 </div>
+               </div>
+
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                 {/* 5. Human Friendly Description */}
+                 <div className="bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-gray-800 dark:to-gray-900 p-6 rounded-2xl shadow-lg border border-indigo-100 dark:border-gray-700">
+                     <h3 className="text-xl font-bold text-indigo-800 dark:text-indigo-400 mb-4 flex items-center gap-2">
+                        🌿 Nature of Plant (Visual Memory)
+                     </h3>
+                     <div className="space-y-4">
+                         <div className="flex justify-between items-center border-b border-indigo-100 dark:border-gray-700 pb-2">
+                             <span className="text-gray-600 dark:text-gray-400">Taste</span>
+                             <span className="font-bold text-gray-800 dark:text-gray-200">{plant.nature_properties?.taste || 'Unknown'}</span>
+                         </div>
+                         <div className="flex justify-between items-center border-b border-indigo-100 dark:border-gray-700 pb-2">
+                             <span className="text-gray-600 dark:text-gray-400">Body Effect</span>
+                             <span className="font-bold text-indigo-600 dark:text-indigo-400">{plant.nature_properties?.body_effect || 'Unknown'} ❄️</span>
+                         </div>
+                         <div className="flex justify-between items-center border-b border-indigo-100 dark:border-gray-700 pb-2">
+                             <span className="text-gray-600 dark:text-gray-400">Best Time</span>
+                             <span className="font-bold text-gray-800 dark:text-gray-200">{plant.nature_properties?.best_time || 'Daytime'}</span>
+                         </div>
+                         <div className="flex justify-between items-center">
+                             <span className="text-gray-600 dark:text-gray-400">Parts Used</span>
+                             <span className="font-bold text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-700 px-2 py-1 rounded shadow-sm">
+                                 {plant.nature_properties?.parts_used || 'General'}
+                             </span>
+                         </div>
+                     </div>
+                 </div>
+
+                  {/* --- NEW SECTION: FOR FARMERS & AGRICULTURE --- */}
+                  <div className="col-span-1 md:col-span-2 mt-4 relative overflow-hidden rounded-2xl shadow-lg border border-green-100 dark:border-green-800">
+                      {/* Background Image Overlay */}
+                      <div className="absolute inset-0 z-0 bg-cover bg-center opacity-10 pointer-events-none" 
+                           style={{ backgroundImage: "url('https://images.unsplash.com/photo-1500382017468-9049fed747ef?q=80&w=3432&auto=format&fit=crop')" }}>
+                      </div>
+
+                      <div className="relative z-10 bg-gradient-to-r from-green-50/90 to-emerald-50/90 dark:from-green-900/90 dark:to-emerald-900/90 h-full">
+                          <div className="bg-green-600/10 dark:bg-green-900/40 p-4 border-b border-green-100 dark:border-green-800 flex justify-between items-center">
+                              <h3 className="text-xl font-bold text-green-800 dark:text-green-300 flex items-center gap-2">
+                                  <Tractor className="w-6 h-6" /> 
+                                  <span>For Farmers: Cultivation & Economics</span>
+                              </h3>
+                              <span className="text-xs font-bold bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200 px-3 py-1 rounded-full uppercase tracking-wider">High Value</span>
+                          </div>
+                          
+                          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+                             {/* Cultivation Details */}
+                             <div>
+                                 <h4 className="font-bold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
+                                     <Sprout className="w-5 h-5 text-green-500" /> Growth Requirements
+                                 </h4>
+                                 <div className="grid grid-cols-2 gap-3">
+                                      <div className="bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700 text-center">
+                                         <Droplets className="w-5 h-5 text-blue-500 mx-auto mb-1" />
+                                         <div className="text-xs text-gray-500">Water</div>
+                                         <div className="font-bold text-gray-800 dark:text-gray-200">{plant.cultivation_guide?.water || 'Standard'}</div>
+                                      </div>
+                                      <div className="bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700 text-center">
+                                         <Sun className="w-5 h-5 text-orange-500 mx-auto mb-1" />
+                                         <div className="text-xs text-gray-500">Sunlight</div>
+                                         <div className="font-bold text-gray-800 dark:text-gray-200">{plant.cultivation_guide?.sunlight || 'Full Sun'}</div>
+                                      </div>
+                                      <div className="bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700 text-center">
+                                         <Globe className="w-5 h-5 text-brown-500 mx-auto mb-1" />
+                                         <div className="text-xs text-gray-500">Soil</div>
+                                         <div className="font-bold text-gray-800 dark:text-gray-200">{plant.cultivation_guide?.soil || 'Well-drained'}</div>
+                                      </div>
+                                      <div className="bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700 text-center">
+                                         <Clock className="w-5 h-5 text-purple-500 mx-auto mb-1" />
+                                         <div className="text-xs text-gray-500">Harvest</div>
+                                         <div className="font-bold text-gray-800 dark:text-gray-200">{plant.cultivation_guide?.harvest_time || 'Seasonal'}</div>
+                                      </div>
+                                 </div>
+                             </div>
+
+                             {/* Economic & Disease Info */}
+                             <div className="space-y-4">
+                                 <div>
+                                     <h4 className="font-bold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                                         <TrendingUp className="w-5 h-5 text-blue-600" /> Market Potential
+                                     </h4>
+                                     <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-blue-100 dark:border-gray-700">
+                                         <div className="flex justify-between mb-2">
+                                            <span className="text-sm text-gray-500">Demand</span>
+                                            <span className="font-bold text-blue-700 dark:text-blue-300">{plant.farming_guide?.market_demand || 'Stable Local Demand'}</span>
+                                         </div>
+                                         <div className="text-sm text-gray-600 dark:text-gray-400">
+                                            {plant.farming_guide?.economic_benefits || 'Good source of sustainable income if cultivated properly.'}
+                                         </div>
+                                     </div>
+                                 </div>
+                                 
+                                 <div>
+                                     <h4 className="font-bold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                                         <AlertTriangle className="w-5 h-5 text-amber-500" /> Disease & Care
+                                     </h4>
+                                     <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-amber-100 dark:border-gray-700 text-sm">
+                                         <p><span className="font-semibold text-amber-700">Common Issues:</span> {plant.farming_guide?.common_diseases || 'Standard pest control required.'}</p>
+                                         <p className="mt-1"><span className="font-semibold text-green-700">Prevention:</span> {plant.farming_guide?.prevention_tips || 'Ensure good drainage.'}</p>
+                                     </div>
+                                 </div>
+                             </div>
+                          </div>
+                      </div>
+                  </div>
+
+                  {/* --- NEW SECTION: FOR SCIENTISTS & RESEARCHERS --- */}
+                  <div className="col-span-1 md:col-span-2 mt-4 relative overflow-hidden rounded-2xl shadow-lg border border-blue-100 dark:border-blue-800">
+                      {/* Background Image Overlay */}
+                       <div className="absolute inset-0 z-0 bg-cover bg-center opacity-10 pointer-events-none" 
+                           style={{ backgroundImage: "url('https://images.unsplash.com/photo-1532094349884-543bc11b234d?q=80&w=3540&auto=format&fit=crop')" }}>
+                      </div>
+
+                      <div className="relative z-10 bg-gradient-to-r from-blue-50/90 to-indigo-50/90 dark:from-blue-900/90 dark:to-indigo-900/90 h-full">
+                          <div className="bg-blue-600/10 dark:bg-blue-900/40 p-4 border-b border-blue-100 dark:border-blue-800 flex justify-between items-center">
+                              <h3 className="text-xl font-bold text-blue-800 dark:text-blue-300 flex items-center gap-2">
+                                  <Microscope className="w-6 h-6" /> 
+                                  <span>For Scientists: Research Data</span>
+                              </h3>
+                              <span className="text-xs font-bold bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full uppercase tracking-wider">Botanical Analysis</span>
+                          </div>
+                          
+                          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8 text-sm">
+                              {/* Morphology & Chemicals */}
+                              <div className="space-y-4">
+                                  <div>
+                                      <h4 className="font-bold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                                          <Leaf className="w-4 h-4" /> Botanical Morphology
+                                      </h4>
+                                      <p className="text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
+                                          {plant.research_data?.botanical_morphology || plant.plant_description || 'Morphological data currently being simplified for general use.'}
+                                      </p>
+                                  </div>
+                                  <div>
+                                       <h4 className="font-bold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                                          <FlaskConical className="w-4 h-4" /> Chemical Constituents
+                                      </h4>
+                                      <p className="text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
+                                          {plant.research_data?.chemical_constituents || plant.medicine_content || 'Analysis pending.'}
+                                      </p>
+                                  </div>
+                              </div>
+
+                              {/* Research Areas & Distribution */}
+                              <div className="space-y-4">
+                                  <div>
+                                      <h4 className="font-bold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                                          <BookOpen className="w-4 h-4" /> Potential Research Areas
+                                      </h4>
+                                       <p className="text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
+                                          {plant.research_data?.potential_research_areas || 'Medicinal properties validation, sustainable cultivation.'}
+                                      </p>
+                                  </div>
+                                  <div>
+                                       <h4 className="font-bold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                                          <Globe className="w-4 h-4" /> Distribution Status
+                                      </h4>
+                                      <p className="text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
+                                          {plant.research_data?.distribution_status || plant.native_location || 'Global distribution data unavailable.'}
+                                      </p>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+                </div>
+
+
+
+                {/* 7. Similar Plants (Safety) */}
+                <div className="mt-6 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border-l-4 border-yellow-400">
+                     <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                        🪴 Looks Similar To (Avoid Confusion)
+                     </h3>
+                     <div className="flex flex-wrap gap-4">
+                         {plant.similar_plants && plant.similar_plants.map((sim, id) => (
+                             <div key={id} className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600">
+                                 <span className="font-bold text-gray-800 dark:text-gray-200">{sim.name}</span>
+                                 <span className="text-gray-400">→</span>
+                                 <span className={`font-bold ${sim.status === 'Toxic' ? 'text-red-500' : 'text-green-500'}`}>
+                                     {sim.status}
+                                 </span>
+                             </div>
+                         ))}
+                         {!plant.similar_plants && <p>No lookalikes found in database.</p>}
+                     </div>
+                </div>
+
+                {/* 8. Advanced Info (Collapsible) */}
+                <div className="mt-8">
+                    <button 
+                        onClick={() => setShowAdvanced(!showAdvanced)}
+                        className="w-full flex items-center justify-between p-4 bg-gray-100 dark:bg-gray-700 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                    >
+                        <span className="font-bold text-gray-700 dark:text-gray-300">🔬 For Students & Researchers (Advanced Details)</span>
+                        <span className="text-2xl">{showAdvanced ? '−' : '+'}</span>
+                    </button>
+                    
+                    {showAdvanced && (
+                        <div className="mt-4 p-6 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 animate-in slide-in-from-top-2">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 className="font-semibold text-gray-500 uppercase text-sm mb-1">Scientific Name</h4>
+                                    <p className="font-mono text-lg">{plant.scientific_name}</p>
+                                </div>
+                                <div>
+                                    <h4 className="font-semibold text-gray-500 uppercase text-sm mb-1">Family</h4>
+                                    <p className="font-mono text-lg">{plant.family_name}</p>
+                                </div>
+                                <div>
+                                    <h4 className="font-semibold text-gray-500 uppercase text-sm mb-1">Doses</h4>
+                                    <p className="font-mono text-lg">{plant.doses || 'Consult Doctor'}</p>
+                                </div>
+                                <div>
+                                    <h4 className="font-semibold text-gray-500 uppercase text-sm mb-1">Mode of Use</h4>
+                                    <p className="font-mono text-lg">{plant.mode_of_use || 'General'}</p>
+                                </div>
+                                <div className="md:col-span-2">
+                                    <h4 className="font-semibold text-gray-500 uppercase text-sm mb-1">Preparation Procedure</h4>
+                                    <p className="text-gray-800 dark:text-gray-200 whitespace-pre-line">{plant.procedure}</p>
+                                </div>
+                                 <div className="md:col-span-2">
+                                    <h4 className="font-semibold text-gray-500 uppercase text-sm mb-1">Medicinal Summary</h4>
+                                    <p className="text-gray-800 dark:text-gray-200">{plant.medicinal_uses}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+             </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

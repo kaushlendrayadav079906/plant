@@ -1,5 +1,9 @@
-gradio
+fastapi
+uvicorn
+python-multipart
 ultralytics
 google-generativeai
 python-dotenv
 opencv-python
+pillow
+numpy
