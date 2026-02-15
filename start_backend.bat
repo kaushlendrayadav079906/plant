@@ -14,9 +14,7 @@ echo [Plant App] Checking dependencies...
 pip install -r requirements.txt
 
 echo.
-echo [Plant App] Running diagnosis...
-python check_setup.py
-echo.
+
 
 echo [Plant App] Starting FastAPI Backend...
 python main.py
