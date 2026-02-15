@@ -1,12 +1,8 @@
---extra-index-url https://download.pytorch.org/whl/cpu
-torch
-torchvision
 fastapi
 uvicorn
 python-multipart
-ultralytics
-google-generativeai
-python-dotenv
-opencv-python-headless
-pillow
+onnxruntime
 numpy
+pillow
+python-dotenv
+google-generativeai
