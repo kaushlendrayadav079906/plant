@@ -24,12 +24,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import logging
 
-# Configure logging to file
+# Configure logging to console (Vercel captures stdout/stderr)
 logging.basicConfig(
-    filename='server_logs.txt',
-    level=logging.ERROR,
+    level=logging.INFO,
     format='%(asctime)s %(levelname)s:%(message)s',
-    force=True
+    handlers=[logging.StreamHandler()]
 )
 
 # --- 0. Pydantic Models for Request/Response ---
@@ -82,8 +81,8 @@ except Exception as e:
     gemini_chat_model = None
 
 # --- 3. HELPER FUNCTION TO GET INFO FROM GEMINI ---
-# --- 3. HELPER FUNCTION TO GET INFO FROM GEMINI ---
-CACHE_FILE = "plant_cache.json"
+# Use /tmp for ephemeral storage on Vercel (read-only system)
+CACHE_FILE = "/tmp/plant_cache.json"
 
 def load_cache():
     if os.path.exists(CACHE_FILE):
@@ -254,7 +253,7 @@ app = FastAPI(
 )
 
 # --- 4.1 SEARCH HISTORY STORAGE ---
-HISTORY_FILE = "history.json"
+HISTORY_FILE = "/tmp/history.json"
 
 def load_history():
     if os.path.exists(HISTORY_FILE):
