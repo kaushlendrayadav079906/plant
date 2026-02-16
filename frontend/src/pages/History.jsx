@@ -2,7 +2,7 @@ import axios from 'axios';
 import { Eye, History as HistoryIcon, Leaf, Loader2, Sprout, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export default function History() {
   const [history, setHistory] = useState([]);

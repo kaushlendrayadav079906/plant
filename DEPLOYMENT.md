@@ -38,16 +38,23 @@ We will deploy the backend to **Render (Free Tier)**, which supports Docker/Pyth
 
 ## ✅ Step 2: Connect Frontend (Netlify) to Backend
 
-Now that your backend is live, you need to tell your Netlify frontend where to find it.
+Now that your backend is live at `https://plant-backend.onrender.com`:
 
-1.  **Go to Netlify Dashboard**.
-2.  Select your frontend site.
-3.  Go to **Site configuration** -> **Environment variables**.
-4.  Click **Add a variable**:
-    *   **Key**: `VITE_API_URL`
-    *   **Value**: `https://plant-backend-api.onrender.com` (Your Render URL)
-5.  **Re-deploy Frontend**:
-    *   Go to **Deploys** tab -> **Trigger deploy** -> **Deploy site**.
+1.  **Local Development**:
+    *   I have created a `.env` file in your `frontend` folder with:
+        ```
+        VITE_API_URL=https://plant-backend.onrender.com
+        ```
+    *   Restart your local frontend (`npm run dev`) to test it.
+
+2.  **Netlify Deployment**:
+    *   Go to **Netlify Dashboard**.
+    *   Select your site.
+    *   Go to **Site configuration** -> **Environment variables**.
+    *   Click **Add a variable**:
+        *   **Key**: `VITE_API_URL`
+        *   **Value**: `https://plant-backend.onrender.com`
+    *   **Re-deploy**: Go to **Deploys** -> **Trigger deploy** -> **Deploy site**.
 
 ## ✅ Step 3: Verify
 
