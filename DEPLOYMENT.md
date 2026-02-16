@@ -54,3 +54,18 @@ Now that your backend is live, you need to tell your Netlify frontend where to f
 1.  Open your website.
 2.  Upload an image.
 3.  It should now successfully send the image to your Render backend and get the result!
+
+## ❌ Troubleshooting Common Errors
+
+### Error: `ModuleNotFoundError: No module named 'your_application'`
+**Cause:** Render is trying to run a default command (`gunicorn`) instead of your FastAPI app.
+**Fix:**
+1. Go to your **Render Dashboard** -> Click your **plant-backend** service.
+2. Click **Settings** on the left side.
+3. Scroll down to **Start Command**.
+4. Change it to: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+5. Click **Save Changes**. Render will automatically redeploy.
+
+### Error: `Function size too large` (on Vercel)
+**Cause:** Vercel has a 250MB limit.
+**Fix:** Use the Render deployment steps above.
