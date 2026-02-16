@@ -24,7 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import logging
 
-# Configure logging to console (Vercel captures stdout/stderr)
+# Configure logging to console (Render captures stdout/stderr)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s %(levelname)s:%(message)s',
@@ -81,7 +81,7 @@ except Exception as e:
     gemini_chat_model = None
 
 # --- 3. HELPER FUNCTION TO GET INFO FROM GEMINI ---
-# Use /tmp for ephemeral storage on Vercel (read-only system)
+# Use /tmp for ephemeral storage on Render (files are lost on restart in free tier)
 CACHE_FILE = "/tmp/plant_cache.json"
 
 def load_cache():

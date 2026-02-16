@@ -11,12 +11,14 @@ if exist venv\Scripts\activate (
 )
 
 echo [Plant App] Checking dependencies...
-pip install -r requirements.txt
+echo [Plant App] Checking dependencies...
+pip install -r backend/requirements.txt
 
 echo.
 
 
 echo [Plant App] Starting FastAPI Backend...
+cd backend
 python main.py
 
 echo.
