@@ -50,13 +50,15 @@ else:
     GEMINI_CONFIGURED = True
 
 # --- 2. LOAD YOUR MODELS (YOLO and Gemini) ---
-model_path = 'best.pt' # Assumes 'best.pt' is in the same 'backend' folder
+# Ensure we load from the correct directory even if running from root
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+model_path = os.path.join(BASE_DIR, 'best.pt')
 
 try:
     yolo_model = YOLO(model_path)
-    print("✅ YOLOv8 model loaded successfully.")
+    print(f"✅ YOLOv8 model loaded successfully from {model_path}.")
 except Exception as e:
-    print(f"❌ ERROR: Could not load the YOLO model from {model_path}. Make sure 'best.pt' is in the 'backend' folder. Error: {e}")
+    print(f"❌ ERROR: Could not load the YOLO model from {model_path}. Error: {e}")
     yolo_model = None
 
 # Personas for Gemini
@@ -81,8 +83,8 @@ except Exception as e:
     gemini_chat_model = None
 
 # --- 3. HELPER FUNCTION TO GET INFO FROM GEMINI ---
-# Use /tmp for ephemeral storage on Render (files are lost on restart in free tier)
-CACHE_FILE = "/tmp/plant_cache.json"
+# Use relative path for Render persistence (or /tmp if ephemeral is fine)
+CACHE_FILE = "plant_cache.json"
 
 def load_cache():
     if os.path.exists(CACHE_FILE):
@@ -253,7 +255,9 @@ app = FastAPI(
 )
 
 # --- 4.1 SEARCH HISTORY STORAGE ---
-HISTORY_FILE = "/tmp/history.json"
+# --- 4.1 SEARCH HISTORY STORAGE ---
+# Use relative path for Render persistence (or /tmp if ephemeral is fine)
+HISTORY_FILE = "history.json"
 
 def load_history():
     if os.path.exists(HISTORY_FILE):
@@ -323,7 +327,7 @@ async def get_plant_details(name: str):
 # to talk to this backend (on http://localhost:8000)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Allow all origins for development
+    allow_origins=["*"], # Allow all origins for development (and Netlify)
     allow_credentials=True,
     allow_methods=["*"], # Allow all methods (GET, POST, etc.)
     allow_headers=["*"], # Allow all headers
