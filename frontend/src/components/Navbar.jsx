@@ -33,7 +33,7 @@ export default function Navbar({ isDark, setIsDark, setShowSplash }) {
               <Leaf className="text-green-600 dark:text-green-400 w-6 h-6" />
             </div>
             <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-700 to-emerald-600 dark:from-green-400 dark:to-emerald-300">
-              PlantAI
+              Plant Recognition System 
             </span>
           </NavLink>
 

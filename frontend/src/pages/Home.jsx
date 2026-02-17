@@ -1,30 +1,191 @@
 import axios from 'axios';
-import { AlertTriangle, BookOpen, Bot, Camera, Clock, Droplets, FlaskConical, Globe, ImageOff, Leaf, Loader2, Microscope, ShieldCheck, Sprout, Sun, Tractor, TrendingUp, Upload, User, X } from 'lucide-react';
+import { AlertTriangle, BookOpen, Bot, Camera, Clock, Droplets, FlaskConical, Globe, ImageOff, Leaf, Loader2, Mic, Microscope, ShieldCheck, Sprout, StopCircle, Sun, Tractor, TrendingUp, Upload, User, Volume2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
-// --- Loading Components ---
-const Spinner = () => <Loader2 className="animate-spin h-5 w-5 mr-3" />;
-const SkeletonLoader = () => (
-  <div className="animate-pulse space-y-4">
-    <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-xl" />
-    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3" />
-    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full" />
-    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-4/5" />
-  </div>
-);
-
+// ... (existing imports)
 
 // --- Home Component ---
 export default function Home({ showSplash, setShowSplash }) {
   // const [showSplash, setShowSplash] = useState(true); // Lifted to App.jsx
   const [activeTab, setActiveTab] = useState('detect');
   const navigate = useNavigate();
+  const location = useLocation();
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  
+  // --- Voice State ---
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState('en-US');
+  const [availableVoices, setAvailableVoices] = useState([]);
+
+  const languages = [
+    { code: 'en-US', name: 'English', label: 'English' },
+    { code: 'hi-IN', name: 'Hindi', label: 'हिंदी (Hindi)' },
+    { code: 'es-ES', name: 'Spanish', label: 'Español' },
+    { code: 'fr-FR', name: 'French', label: 'Français' },
+  ];
+
+
+  // --- Voice Functions ---
+  
+  // Load voices securely
+  useEffect(() => {
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      setAvailableVoices(voices);
+    };
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    return () => {
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.onvoiceschanged = null;
+    };
+  }, []);
+
+  const speakMessage = (text) => {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const startListening = () => {
+    if (!('webkitSpeechRecognition' in window)) {
+        alert("Voice input is not supported in this browser.");
+        return;
+    }
+    const recognition = new window.webkitSpeechRecognition();
+    recognition.lang = selectedLanguage;
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = (e) => {
+        console.error("Speech recognition error", e);
+        setIsListening(false);
+    };
+
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setChatInput(transcript);
+    };
+
+    recognition.start();
+  };
+
+  // --- Voice Guide Logic ---
+  const generateSummary = (plant, lang) => {
+    const getYesNoText = (val, yesText, noText) => val === 'YES' ? yesText : noText;
+
+    if (lang === 'hi-IN') {
+        const safe_eat = getYesNoText(plant.quick_safety?.safe_eat, 'सुरक्षित है', 'असुरक्षित है');
+        return `नमस्ते। यह ${plant.common_name} है। 
+        वैज्ञानिक नाम: ${plant.scientific_name}।
+        सुरक्षा: ${safe_eat}।
+        मुख्य फायदे: ${plant.diseases_cured || 'सामान्य रोग'}।
+        उपयोग: ${plant.mode_of_use || 'सलाह लें'}।`;
+    }
+    
+    // Default English
+    return `Hello. We identified this as ${plant.common_name}. 
+    Ideally known as ${plant.scientific_name}.
+    Confidence: ${plant.confidence || 'High'}.
+    
+    Safety: ${getYesNoText(plant.quick_safety?.safe_eat, 'Safe to eat.', 'Do not eat directly.')}
+    Medicinal Uses: ${plant.diseases_cured || 'General health'}.
+    How to use: ${plant.mode_of_use || 'Consult an expert'}.`;
+  };
+
+  const handleSpeak = (plant) => {
+    // Stop any current speech
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.resume();
+
+    if (isSpeaking) {
+      setIsSpeaking(false);
+      return;
+    }
+    
+    if (!plant) return;
+
+    const summary = generateSummary(plant, selectedLanguage);
+    console.log("Speaking summary:", summary);
+
+    const utterance = new SpeechSynthesisUtterance(summary);
+    utterance.lang = selectedLanguage;
+    utterance.rate = 1.0; 
+    
+    // FORCE VOICE SELECTION causing potential silence if not set in some browsers
+    let voices = window.speechSynthesis.getVoices();
+    console.log("Available voices:", voices.length, voices.map(v => v.name));
+    
+    // Fix for Chrome needing voices to be loaded:
+    if (voices.length === 0) {
+        console.warn("No voices loaded yet. Waiting for onvoiceschanged...");
+        // In a real app we might wait, but here just try letting browser default
+    }
+
+    // Try to find a voice matching the language exactly, preferring Google
+    let voice = voices.find(v => v.lang === selectedLanguage && v.name.includes("Google"));
+    if (!voice) voice = voices.find(v => v.lang === selectedLanguage);
+    if (!voice) voice = voices.find(v => v.lang.startsWith(selectedLanguage.slice(0, 2)));
+
+    if (voice) {
+        utterance.voice = voice;
+        console.log("Forcing voice:", voice.name);
+    } else {
+        console.warn("No matching voice found for", selectedLanguage, "letting browser decide.");
+    }
+
+    utterance.onstart = () => {
+        console.log("Speech started");
+        setIsSpeaking(true);
+    };
+    utterance.onend = () => {
+        console.log("Speech ended");
+        setIsSpeaking(false);
+    };
+    utterance.onerror = (e) => {
+         console.error("Speech error:", e);
+         setIsSpeaking(false);
+    };
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // --- Restore State on Mount ---
+  useEffect(() => {
+    if (location.state?.restoredDetectionResult) {
+       setDetectionResult(location.state.restoredDetectionResult);
+       setPreviewUrl(location.state.restoredPreviewUrl);
+       setActiveTab('detect');
+       // If we have a plant name, set it for chat
+       const plantData = location.state.restoredDetectionResult.plant_data?.[0];
+       if (plantData && plantData.name) {
+         setChatPlantName(plantData.name);
+         setChatMessages([{ sender: 'bot', text: `Welcome back! I still remember ${plantData.name}. Need more info?` }]);
+       }
+       // Clear state to prevent loop if we navigate back/forward separately? 
+       // Actually replace state might be better, but for now this works.
+       // window.history.replaceState({}, document.title) // Optional cleanup
+    }
+  }, [location.state]);
+
+  // --- Loading Components ---
+  const Spinner = () => <Loader2 className="animate-spin h-5 w-5 mr-3" />;
+  const SkeletonLoader = () => (
+    <div className="animate-pulse space-y-4">
+      <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-xl" />
+      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3" />
+      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full" />
+      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-4/5" />
+    </div>
+  );
 
   // --- Camera State ---
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -44,7 +205,6 @@ export default function Home({ showSplash, setShowSplash }) {
 
   const fileInputRef = useRef(null);
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-  console.log("Current API URL:", API_URL); // Debugging log
 
   // --- File Upload ---
   const handleFileChange = (e) => {
@@ -132,7 +292,6 @@ export default function Home({ showSplash, setShowSplash }) {
 
       if (response.data.plant_data?.length > 0) {
         const firstPlant = response.data.plant_data[0];
-        // Only skip if it's a "No plant detected" error
         if (firstPlant.name !== "No plant detected") {
            const plantName = firstPlant.name || 'your plant';
            setChatPlantName(plantName);
@@ -179,11 +338,11 @@ export default function Home({ showSplash, setShowSplash }) {
 
   // --- Splash Screen Logic ---
   const backgroundImages = [
-    "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=2560&auto=format&fit=crop", // Nature wide
-    "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?q=80&w=2560&auto=format&fit=crop", // Forest
-    "https://images.unsplash.com/photo-1501854140884-074bf86ee91c?q=80&w=2560&auto=format&fit=crop", // Dark leaves
-    "https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?q=80&w=2560&auto=format&fit=crop", // Garden
-    "https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?q=80&w=2560&auto=format&fit=crop"  // Green droplets
+    "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=2560&auto=format&fit=crop", 
+    "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?q=80&w=2560&auto=format&fit=crop", 
+    "https://images.unsplash.com/photo-1501854140884-074bf86ee91c?q=80&w=2560&auto=format&fit=crop", 
+    "https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?q=80&w=2560&auto=format&fit=crop", 
+    "https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?q=80&w=2560&auto=format&fit=crop"
   ];
 
   const [currentBgIndex, setCurrentBgIndex] = useState(0);
@@ -192,7 +351,7 @@ export default function Home({ showSplash, setShowSplash }) {
     if (!showSplash) return;
     const interval = setInterval(() => {
        setCurrentBgIndex((prev) => (prev + 1) % backgroundImages.length);
-    }, 3000); // Change image every 3 seconds
+    }, 3000);
     return () => clearInterval(interval);
   }, [showSplash]);
 
@@ -203,7 +362,6 @@ export default function Home({ showSplash, setShowSplash }) {
         className="fixed inset-0 z-[100] flex flex-col items-center justify-center text-white cursor-pointer select-none overflow-hidden bg-black"
         onClick={() => setShowSplash(false)}
       >
-        {/* Background Slideshow */}
         {backgroundImages.map((img, index) => (
             <div 
                 key={index}
@@ -211,31 +369,18 @@ export default function Home({ showSplash, setShowSplash }) {
                 style={{ backgroundImage: `url(${img})` }}
             />
         ))}
-
-        {/* Radial Gradient Overlay for Focus */}
         <div className="absolute inset-0 bg-radial-gradient from-black/20 via-black/60 to-black/90 backdrop-blur-[2px]"></div>
-        
-        {/* Content Container */}
         <div className="z-10 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in duration-1000">
-          
-          {/* Brand Overline */}
-          <div className="mb-8 text-lime-400 font-bold tracking-[0.3em] uppercase text-sm animate-in slide-in-from-top-4 duration-1000 drop-shadow-md">
-            PlantAI Technology
+          <div className="mb-12 text-lime-600 font-bold tracking-[0.3em] uppercase text-sm animate-in slide-in-from-top-4 duration-1000 drop-shadow-md">
+            Plant Detection 
           </div>
-
-          {/* COLORFUL CIRCULAR LOGO */}
-          {/* Creating a multi-color gradient ring */}
           <div className="relative mb-8 group">
              <div className="absolute -inset-1 bg-gradient-to-r from-teal-400 via-green-500 to-lime-500 rounded-full blur opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-tilt"></div>
              <div className="relative w-36 h-36 bg-white rounded-full flex items-center justify-center ring-4 ring-white shadow-2xl overflow-hidden">
-                {/* Subtle inner highlight */}
                 <div className="absolute inset-0 bg-gradient-to-tr from-green-50 to-transparent opacity-50"></div>
-                {/* Colored Leaf */}
                 <Leaf className="w-20 h-20 text-green-600 drop-shadow-md transform transition-transform group-hover:scale-110 duration-500 fill-green-100" />
              </div>
           </div>
-
-          {/* Heading */}
           <h1 className="font-black mb-6 drop-shadow-2xl leading-tight">
             <span className="block text-4xl md:text-6xl text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-200 to-white tracking-wide uppercase mb-2">
               Medicinal Plant
@@ -244,11 +389,9 @@ export default function Home({ showSplash, setShowSplash }) {
               Recognition System
             </span>
           </h1>
-
           <p className="text-lg md:text-2xl font-medium text-gray-300 max-w-2xl leading-relaxed mb-12 drop-shadow-lg">
             Instant identification & detailed healing properties <br className="hidden md:block"/>powered by advanced AI.
           </p>
-
           <div className="group relative px-8 py-4 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full overflow-hidden transition-all duration-300 hover:scale-105 border border-white/20 hover:border-green-400/50 shadow-[0_0_30px_rgba(0,0,0,0.3)]">
             <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]"></div>
             <span className="relative text-sm font-bold tracking-[0.2em] uppercase text-white group-hover:text-green-300 transition-colors flex items-center gap-3">
@@ -303,7 +446,6 @@ export default function Home({ showSplash, setShowSplash }) {
           )}
         </div>
 
-        {/* Camera Button */}
         <button
           onClick={startCamera}
           className="mt-4 bg-blue-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-blue-700 transition"
@@ -311,7 +453,6 @@ export default function Home({ showSplash, setShowSplash }) {
           <Camera className="h-5 w-5" /> Open Camera
         </button>
 
-        {/* Camera Stream */}
         {cameraOpen && (
           <div className="mt-4 flex flex-col items-center">
             {cameraError ? (
@@ -331,7 +472,6 @@ export default function Home({ showSplash, setShowSplash }) {
           </div>
         )}
 
-        {/* Detect Button */}
         <button
           onClick={handleSubmitDetection}
           disabled={!selectedFile || isLoading}
@@ -339,6 +479,44 @@ export default function Home({ showSplash, setShowSplash }) {
         >
           {isLoading ? <Spinner /> : 'Detect Plant'}
         </button>
+
+        {/* VOICE ASSISTANT UI */}
+        {detectionResult?.plant_data?.[0] && !detectionResult.plant_data[0].error && (
+            <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                    <Volume2 className="w-5 h-5 text-indigo-500" />
+                    AI Voice Guide
+                </h3>
+                
+                <div className="flex flex-col gap-3">
+                    <div className="relative">
+                        <select 
+                            value={selectedLanguage}
+                            onChange={(e) => setSelectedLanguage(e.target.value)}
+                            className="w-full appearance-none bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 py-3 pl-4 pr-10 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                        >
+                            {languages.map(lang => (
+                                <option key={lang.code} value={lang.code}>{lang.label}</option>
+                            ))}
+                        </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">▼</div>
+                    </div>
+
+                    <button 
+                        onClick={() => handleSpeak(detectionResult.plant_data[0])}
+                        className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-bold shadow-md transition-all ${
+                            isSpeaking 
+                            ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse' 
+                            : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                        }`}
+                    >
+                        {isSpeaking ? <StopCircle size={20} /> : <Volume2 size={20} />}
+                        {isSpeaking ? 'Stop Explanation' : 'Explain Findings'}
+                    </button>
+                </div>
+            </div>
+        )}
+
       </div>
 
       {/* RIGHT: Output + Chat */}
@@ -354,10 +532,17 @@ export default function Home({ showSplash, setShowSplash }) {
           >
             Detection Result
           </button>
+
           <button
             onClick={() => {
               if (detectionResult?.plant_data?.[0] && !detectionResult.plant_data[0].error) {
-                 navigate('/analysis', { state: { plant: detectionResult.plant_data[0], previewUrl } });
+                 navigate('/analysis', { 
+                    state: { 
+                      plant: detectionResult.plant_data[0], 
+                      previewUrl,
+                      fullDetectionResult: detectionResult // Pass full result for restoration
+                    } 
+                 });
               } else {
                  alert("Please detect a plant first to see the analysis.");
               }
@@ -395,7 +580,7 @@ export default function Home({ showSplash, setShowSplash }) {
                   className="rounded-xl border border-gray-200 w-full shadow-md transition-transform duration-300"
                 />
                 <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-white text-xs font-bold border border-white/20">
-                    AI Vision v2.0
+                    Plant Image
                 </div>
               </div>
             )}
@@ -423,7 +608,7 @@ export default function Home({ showSplash, setShowSplash }) {
                     <p>Ask me anything about {chatPlantName}!</p>
                  </div>
               )}
-              {chatMessages.map((msg, idx) => (
+                  {chatMessages.map((msg, idx) => (
                 <div
                   key={idx}
                   className={`flex ${
@@ -445,13 +630,22 @@ export default function Home({ showSplash, setShowSplash }) {
                       {msg.sender === 'user' ? <User size={16} /> : <Bot size={16} />}
                     </div>
                     <div
-                      className={`px-4 py-3 rounded-2xl text-sm shadow-sm ${
+                      className={`px-4 py-3 rounded-2xl text-sm shadow-sm relative group ${
                         msg.sender === 'user'
                           ? 'bg-blue-600 text-white rounded-br-none'
                           : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-600 rounded-bl-none'
                       }`}
                     >
                       {msg.text}
+                      {msg.sender === 'bot' && (
+                        <button 
+                            onClick={() => speakMessage(msg.text)}
+                            className="absolute -right-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full text-gray-500"
+                            title="Read Aloud"
+                        >
+                            <Volume2 size={16} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -468,20 +662,29 @@ export default function Home({ showSplash, setShowSplash }) {
             </div>
             
             <form onSubmit={handleSubmitChat} className="mt-4 relative">
-              <div className="relative flex items-center">
-                <input
-                  type="text"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  placeholder={`Ask about ${chatPlantName}...`}
-                  className="w-full pl-4 pr-12 py-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/50 transition-all shadow-sm"
-                />
+              <div className="relative flex items-center gap-2">
+                <div className="relative flex-grow">
+                    <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder={`Ask about ${chatPlantName}...`}
+                    className="w-full pl-4 pr-12 py-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/50 transition-all shadow-sm"
+                    />
+                    <button
+                        type="button"
+                        onClick={startListening}
+                        className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-colors ${isListening ? 'bg-red-100 text-red-600 animate-pulse' : 'hover:bg-gray-200 text-gray-400'}`}
+                        title="Voice Input"
+                    >
+                        <Mic size={20} />
+                    </button>
+                </div>
                 <button
                   type="submit"
                   disabled={!chatInput.trim() || isChatLoading}
-                  className="absolute right-2 p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="p-4 bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md"
                 >
-                  <User className="h-5 w-5 rotate-90" /> {/* Using User icon rotated as send icon for now, or just send text */}
                   <span className="sr-only">Send</span>
                   ➡️
                 </button>

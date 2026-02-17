@@ -73,6 +73,13 @@ Now that your backend is live at `https://plant-backend.onrender.com`:
 4. Change it to: `uvicorn main:app --host 0.0.0.0 --port $PORT`
 5. Click **Save Changes**. Render will automatically redeploy.
 
-### Error: `Function size too large` (on Vercel)
-**Cause:** Vercel has a 250MB limit.
-**Fix:** Use the Render deployment steps above.
+### Error: `Could not find a version that satisfies the requirement torch==2.2.2+cpu`
+**Cause:** Render is using the wrong Python version (e.g., 3.14+).
+**Fix:**
+1.  **Ensured `runtime.txt` is in the ROOT folder**: I have moved `runtime.txt` to the main folder so Render can see it.
+2.  **Environment Variable Override**: 
+    - Go to **Render Dashboard** -> **plant-backend** -> **Environment**.
+    - Add/Edit: `PYTHON_VERSION` = `3.10.13`
+    - Click **Save Changes**.
+
+
