@@ -1,9 +1,10 @@
-import { History, Leaf, Menu, Moon, Sun, X } from 'lucide-react';
+import { History, Leaf, Menu, Moon, Sun, X, LogIn, LogOut } from 'lucide-react';
 import { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 
-export default function Navbar({ isDark, setIsDark, setShowSplash }) {
+export default function Navbar({ isDark, setIsDark, setShowSplash, isLoggedIn, setIsLoggedIn }) {
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
 
   const toggleMenu = () => setIsOpen(!isOpen);
 
@@ -12,6 +13,13 @@ export default function Navbar({ isDark, setIsDark, setShowSplash }) {
     if (linkName === "Home") {
       setShowSplash(true);
     }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    setIsLoggedIn(false);
+    navigate('/');
+    setIsOpen(false);
   };
 
   const navLinks = [
@@ -66,6 +74,24 @@ export default function Navbar({ isDark, setIsDark, setShowSplash }) {
             >
               {isDark ? <Sun size={20} className="text-yellow-400" /> : <Moon size={20} />}
             </button>
+            
+            {isLoggedIn ? (
+              <button 
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 rounded-lg text-sm font-medium transition-colors"
+              >
+                <LogOut size={18} />
+                Logout
+              </button>
+            ) : (
+              <button 
+                onClick={() => { navigate('/auth'); setIsOpen(false); }}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+              >
+                <LogIn size={18} />
+                Login
+              </button>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -110,6 +136,26 @@ export default function Navbar({ isDark, setIsDark, setShowSplash }) {
               {link.name}
             </NavLink>
           ))}
+          
+          <div className="h-px bg-gray-100 dark:bg-gray-700 my-2 mx-4"></div>
+          
+          {isLoggedIn ? (
+              <button 
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-4 py-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl text-base font-medium transition-colors"
+              >
+                <LogOut size={20} />
+                Logout
+              </button>
+          ) : (
+              <button 
+                onClick={() => { navigate('/auth'); setIsOpen(false); }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl text-base font-medium transition-colors"
+              >
+                <LogIn size={20} />
+                Login / Sign Up
+              </button>
+          )}
         </div>
       </div>
     </nav>

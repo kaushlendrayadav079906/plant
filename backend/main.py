@@ -23,6 +23,18 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import logging
+import datetime
+from database import (
+    MONGO_CONNECTED,
+    create_history_record,
+    get_all_history,
+    delete_all_history,
+    delete_history_item_by_match,
+    create_user,
+    authenticate_user,
+    get_plant_from_db,
+    save_plant_to_db
+)
 
 # Configure logging to console (Render captures stdout/stderr)
 logging.basicConfig(
@@ -37,6 +49,15 @@ class ChatRequest(BaseModel):
     plant_name: str
     message: str
 
+class UserSignup(BaseModel):
+    name: str
+    email: str
+    password: str
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
 # --- 1. LOAD ENVIRONMENT VARIABLES and CONFIGURE API KEY ---
 load_dotenv() 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -48,6 +69,8 @@ else:
     genai.configure(api_key=GEMINI_API_KEY)
     print("✅ Gemini API configured successfully.")
     GEMINI_CONFIGURED = True
+
+# MongoDB setup has been moved to database.py
 
 # --- 2. LOAD YOUR MODELS (YOLO and Gemini) ---
 # Ensure we load from the correct directory even if running from root
@@ -105,10 +128,18 @@ def save_cache(cache_data):
 def get_plant_info_from_gemini(plant_name: str):
     """Asks the Gemini API for details and expects a JSON response."""
     
-    # 1. Check Cache first
+    # 0. Check Database first
+    db_plant = get_plant_from_db(plant_name)
+    if db_plant:
+        print(f"✅ Found {plant_name} in MongoDB. Skipping API call.")
+        return db_plant
+
+    # 1. Check Cache (Fallback)
     cache = load_cache()
     if plant_name in cache:
         print(f"✅ Found {plant_name} in local cache. Skipping API call.")
+        # Try to sync with DB if connected
+        save_plant_to_db(plant_name, cache[plant_name])
         return cache[plant_name]
 
     if not gemini_data_model:
@@ -228,10 +259,13 @@ def get_plant_info_from_gemini(plant_name: str):
         data = json.loads(clean_json_text)
         data['name'] = plant_name # Add the original name for convenience
         
-        # Save success to cache
+        # Save success to cache and DB
         cache = load_cache()
         cache[plant_name] = data
         save_cache(cache)
+        
+        save_plant_to_db(plant_name, data)
+        print(f"✅ Saved full {plant_name} info to MongoDB")
         
         return data
     except Exception as e:
@@ -281,16 +315,26 @@ def save_to_history(plant_name, date_time, confidence=None):
     entry = {
         "plant_name": plant_name,
         "date": date_time,
-        "confidence": confidence
+        "confidence": confidence,
+        "timestamp": datetime.datetime.now()
     }
+    
+    # Save to JSON file as fallback
     SEARCH_HISTORY.insert(0, entry) # Add to beginning
     if len(SEARCH_HISTORY) > 50:
         SEARCH_HISTORY.pop()
     save_history_to_file(SEARCH_HISTORY)
 
+    # Save to MongoDB Database
+    if create_history_record(entry):
+        print(f"✅ Saved {plant_name} to MongoDB")
+
 @app.get("/history")
 async def get_history():
     """Returns the search history."""
+    db_records = get_all_history()
+    if db_records is not None:
+        return {"history": db_records}
     return {"history": SEARCH_HISTORY}
 
 @app.delete("/history")
@@ -299,6 +343,10 @@ async def clear_history():
     global SEARCH_HISTORY
     SEARCH_HISTORY = []
     save_history_to_file(SEARCH_HISTORY)
+    
+    if delete_all_history():
+        print("✅ Cleared history in MongoDB")
+            
     return {"message": "History cleared"}
 
 @app.delete("/history/{index}")
@@ -309,6 +357,11 @@ async def delete_history_item(index: int):
         if 0 <= index < len(SEARCH_HISTORY):
             removed = SEARCH_HISTORY.pop(index)
             save_history_to_file(SEARCH_HISTORY)
+            
+            # Delete from MongoDB using plant_name and date to identify it
+            if delete_history_item_by_match(removed["plant_name"], removed["date"]):
+                print(f"✅ Deleted {removed['plant_name']} from MongoDB")
+                    
             return {"message": f"Deleted {removed['plant_name']}"}
         else:
              raise HTTPException(status_code=404, detail="Item not found")
@@ -334,9 +387,7 @@ app.add_middleware(
 )
 
 # --- 7.1 HISTORY ENDPOINT ---
-@app.get("/history")
-def get_history():
-    return {"history": SEARCH_HISTORY}
+# Duplicate history endpoint removed (handled by async get_history above)
 
 # --- 6. API "ROOT" ENDPOINT ---
 @app.get("/")
@@ -650,6 +701,33 @@ async def chat_with_bot(request: ChatRequest):
         else:
             # If we really don't know anything
             return {"response": f"I don't have information about '{request.plant_name}' right now. Please try uploading the image again or ask about a specific plant."}
+
+# --- 8.5 AUTHENTICATION ENDPOINTS ---
+@app.post("/signup")
+async def signup(user: UserSignup):
+    try:
+        new_user = create_user(user.name, user.email, user.password)
+        if new_user is None:
+            raise HTTPException(status_code=400, detail="Email already registered")
+            
+        return {"message": "User created successfully", "user": new_user}
+    except Exception as e:
+        if str(e) == "Database not connected":
+            raise HTTPException(status_code=500, detail="Database not connected")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/login")
+async def login(user: UserLogin):
+    try:
+        db_user = authenticate_user(user.email, user.password)
+        if not db_user:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+            
+        return {"message": "Login successful", "user": db_user}
+    except Exception as e:
+        if str(e) == "Database not connected":
+            raise HTTPException(status_code=500, detail="Database not connected")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- 9. RUN THE APP (if this file is run directly) ---
 if __name__ == "__main__":

@@ -1,0 +1,32 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      # Map host port 8000 to container port 10000
+      # (frontend expects backend at localhost:8000)
+      - "8000:10000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app/backend
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    env_file:
+      - ./frontend/.env
+    volumes:
+      - ./frontend:/app
+      # Use an anonymous volume to prevent local node_modules from overriding the container's
+      - /app/node_modules
+    depends_on:
+      - backend
+    restart: unless-stopped
