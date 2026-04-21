@@ -18,6 +18,8 @@ from google import genai
 from google.genai import types
 import os
 os.environ["YOLO_CONFIG_DIR"] = "/tmp/Ultralytics"
+import torch
+torch.set_num_threads(1) # CRITICAL: Reduces memory usage to prevent 502 errors on Render free tier
 from ultralytics import YOLO
 from backend.plant_database import get_fallback_data
 from dotenv import load_dotenv
@@ -488,13 +490,16 @@ async def predict_plant(file: UploadFile = File(...)):
         # Limit image size to avoid OOM on large uploads
         pil_image = Image.open(file.file)
         
-        # Resize if image is too large (e.g. > 1024px) to save memory/time
-        max_size = 1024
+        # Resize if image is too large (e.g. > 640px) to save memory/time
+        max_size = 640
         if pil_image.width > max_size or pil_image.height > max_size:
             pil_image.thumbnail((max_size, max_size))
         
         if pil_image.mode != "RGB":
             pil_image = pil_image.convert("RGB")
+            
+        import gc
+        gc.collect()
             
         # --- Run YOLO detection ---
         print("Running YOLO detection...")
