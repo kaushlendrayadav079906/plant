@@ -379,7 +379,11 @@ async def get_plant_details(name: str):
 # to talk to this backend (on http://localhost:8000)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Allow all origins for development (and Netlify)
+    allow_origins=[
+        "http://localhost:5173",
+        "https://relaxed-pegasus-da5dd2.netlify.app",
+        "https://plant-2-9w9a.onrender.com"
+    ],
     allow_credentials=True,
     allow_methods=["*"], # Allow all methods (GET, POST, etc.)
     allow_headers=["*"], # Allow all headers
@@ -619,12 +623,11 @@ async def predict_plant(file: UploadFile = File(...)):
         print(f"❌ {error_msg}")
         traceback.print_exc()
         
-        # Return a JSON response with 500 status and CORS headers explicitly set
+        # Return a JSON response with 500 status (CORS handled by middleware)
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=500,
-            content={"detail": error_msg},
-            headers={"Access-Control-Allow-Origin": "*"}
+            content={"detail": error_msg}
         )
 
 
