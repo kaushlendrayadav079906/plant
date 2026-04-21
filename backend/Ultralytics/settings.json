@@ -1,0 +1,21 @@
+{
+  "settings_version": "0.0.6",
+  "datasets_dir": "C:\\Users\\Lenovo\\Documents\\datasets",
+  "weights_dir": "C:\\Users\\Lenovo\\Documents\\Plant - Copy\\weights",
+  "runs_dir": "C:\\Users\\Lenovo\\Documents\\Plant - Copy\\runs",
+  "uuid": "21b6df2dff0f6e49fc0da7ad1399e2d48cea37765b6c18399f166c9864ec2cb8",
+  "sync": true,
+  "api_key": "",
+  "openai_api_key": "",
+  "clearml": true,
+  "comet": true,
+  "dvc": true,
+  "hub": true,
+  "mlflow": true,
+  "neptune": true,
+  "raytune": true,
+  "tensorboard": false,
+  "wandb": false,
+  "vscode_msg": true,
+  "openvino_msg": true
+}

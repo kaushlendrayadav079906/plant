@@ -14,8 +14,26 @@ import io
 import base64
 import numpy as np
 import uvicorn
-from google import genai
-from google.genai import types
+import sys
+import os
+import subprocess
+
+# Add the parent directory to the Python path so 'from backend...' imports work 
+# even when you run 'python main.py' from inside the backend folder.
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+try:
+    from google import genai
+    from google.genai import types
+except ImportError:
+    print("🛠️  Auto-fixing: 'google-genai' is missing. Installing it now in your virtual environment...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "google-genai"])
+    print("✅ Installation complete! Loading packages...")
+    from google import genai
+    from google.genai import types
 import os
 os.environ["YOLO_CONFIG_DIR"] = "/tmp/Ultralytics"
 import torch
@@ -293,6 +311,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
         "https://relaxed-pegasus-da5dd2.netlify.app"
     ],
     allow_credentials=True,
