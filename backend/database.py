@@ -26,9 +26,11 @@ history_collection = None
 plants_collection = None
 users_collection = None
 
+import certifi
+
 try:
     # 30 seconds timeout to safely allow MongoDB Atlas to connect
-    mongo_client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=30000)
+    mongo_client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=30000, tlsCAFile=certifi.where())
     db = mongo_client[MONGODB_DB_NAME]
     history_collection = db["history"]
     plants_collection = db["plants"] # For caching plant information

@@ -14,7 +14,10 @@ import io
 import base64
 import numpy as np
 import uvicorn
-import google.generativeai as genai
+from google import genai
+from google.genai import types
+import os
+os.environ["YOLO_CONFIG_DIR"] = "/tmp/Ultralytics"
 from ultralytics import YOLO
 from plant_database import get_fallback_data
 from dotenv import load_dotenv
@@ -62,11 +65,13 @@ class UserLogin(BaseModel):
 load_dotenv() 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
+gemini_client = None
+
 if not GEMINI_API_KEY:
     print("❌ ERROR: GEMINI_API_KEY not found. Please check your .env file in the 'backend' folder.")
     GEMINI_CONFIGURED = False
 else:
-    genai.configure(api_key=GEMINI_API_KEY)
+    gemini_client = genai.Client(api_key=GEMINI_API_KEY)
     print("✅ Gemini API configured successfully.")
     GEMINI_CONFIGURED = True
 
@@ -88,22 +93,10 @@ except Exception as e:
 botanist_persona = "You are a world-class botanist. For any plant name given, you must respond only with a JSON object containing the requested details."
 chat_persona = "You are a helpful and expert botanist. The user has just identified a plant. Answer their follow-up questions clearly and concisely."
 
-try:
-    # Model for JSON data extraction
-    gemini_data_model = genai.GenerativeModel(
-        'gemini-2.0-flash',
-        system_instruction=botanist_persona
-    )
-    # Model for follow-up chat
-    gemini_chat_model = genai.GenerativeModel(
-        'gemini-2.0-flash',
-        system_instruction=chat_persona
-    )
-    print("✅ Gemini 2.0 Flash models initialized.")
-except Exception as e:
-    print(f"❌ ERROR: Could not initialize Gemini models: {e}")
-    gemini_data_model = None
-    gemini_chat_model = None
+if gemini_client:
+    print("✅ Gemini 2.0 Flash client ready.")
+else:
+    print("❌ ERROR: Gemini client not initialized.")
 
 # --- 3. HELPER FUNCTION TO GET INFO FROM GEMINI ---
 # Use relative path for Render persistence (or /tmp if ephemeral is fine)
@@ -142,8 +135,8 @@ def get_plant_info_from_gemini(plant_name: str):
         save_plant_to_db(plant_name, cache[plant_name])
         return cache[plant_name]
 
-    if not gemini_data_model:
-        return {"error": "Gemini data model not initialized."}
+    if not gemini_client:
+        return {"error": "Gemini client not initialized."}
         
     print(f"\nAsking Gemini for info on: {plant_name}...")
     
@@ -245,7 +238,13 @@ def get_plant_info_from_gemini(plant_name: str):
     - Be clear, safe, and helpful.
     """
     try:
-        response = gemini_data_model.generate_content(prompt)
+        response = gemini_client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=botanist_persona
+            )
+        )
         text_response = response.text.strip()
         
         # Robust JSON extraction
@@ -413,7 +412,6 @@ def verify_plant_with_gemini(image: Image.Image, detected_name: str, retries=3):
     
     for attempt in range(retries):
         try:
-            model = genai.GenerativeModel('gemini-2.0-flash')
             
             prompt = f"""
             You are an expert botanist. 
@@ -431,7 +429,10 @@ def verify_plant_with_gemini(image: Image.Image, detected_name: str, retries=3):
             }}
             """
             
-            response = model.generate_content([prompt, image])
+            response = gemini_client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=[prompt, image]
+            )
             text = response.text.strip()
             
             # Clean JSON
@@ -634,15 +635,19 @@ async def chat_with_bot(request: ChatRequest):
     This endpoint receives a plant name and a chat message,
     and returns a response from Gemini.
     """
-    if not gemini_chat_model:
-        raise HTTPException(status_code=500, detail="Gemini chat model not initialized.")
+    if not gemini_client:
+        raise HTTPException(status_code=500, detail="Gemini client not initialized.")
 
     print(f"\nChatting about: {request.plant_name}. User asked: {request.message}")
     
-    chat_session = gemini_chat_model.start_chat()
-    prompt = f"The user has just identified a '{request.plant_name}'. They are now asking: '{request.message}'. Please answer their question."
-    
     try:
+        chat_session = gemini_client.chats.create(
+            model='gemini-2.0-flash',
+            config=types.GenerateContentConfig(
+                system_instruction=chat_persona
+            )
+        )
+        prompt = f"The user has just identified a '{request.plant_name}'. They are now asking: '{request.message}'. Please answer their question."
         response = chat_session.send_message(prompt)
         return {"response": response.text}
     except Exception as e:
