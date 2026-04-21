@@ -287,6 +287,19 @@ app = FastAPI(
     description="API for detecting medicinal plants and getting information."
 )
 
+# --- 5. CONFIGURE CORS (This is the connection!) ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "https://relaxed-pegasus-da5dd2.netlify.app",
+        "https://plant-2-9w9a.onrender.com"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"], # Allow all methods (GET, POST, etc.)
+    allow_headers=["*"], # Allow all headers
+)
+
 # --- 4.1 SEARCH HISTORY STORAGE ---
 # --- 4.1 SEARCH HISTORY STORAGE ---
 # Use relative path for Render persistence (or /tmp if ephemeral is fine)
@@ -374,20 +387,7 @@ async def get_plant_details(name: str):
     data = get_plant_info_from_gemini(name)
     return data
 
-# --- 5. CONFIGURE CORS (This is the connection!) ---
-# This allows your React frontend (on http://localhost:5173) 
-# to talk to this backend (on http://localhost:8000)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "https://relaxed-pegasus-da5dd2.netlify.app",
-        "https://plant-2-9w9a.onrender.com"
-    ],
-    allow_credentials=True,
-    allow_methods=["*"], # Allow all methods (GET, POST, etc.)
-    allow_headers=["*"], # Allow all headers
-)
+
 
 # --- 7.1 HISTORY ENDPOINT ---
 # Duplicate history endpoint removed (handled by async get_history above)
