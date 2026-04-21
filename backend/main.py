@@ -19,7 +19,7 @@ from google.genai import types
 import os
 os.environ["YOLO_CONFIG_DIR"] = "/tmp/Ultralytics"
 from ultralytics import YOLO
-from plant_database import get_fallback_data
+from backend.plant_database import get_fallback_data
 from dotenv import load_dotenv
 from PIL import Image
 from fastapi import FastAPI, UploadFile, File, HTTPException
@@ -27,7 +27,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import logging
 import datetime
-from database import (
+from backend.database import (
     MONGO_CONNECTED,
     create_history_record,
     get_all_history,
@@ -741,4 +741,5 @@ async def login(user: UserLogin):
 if __name__ == "__main__":
     if not yolo_model or not GEMINI_CONFIGURED:
         print("⚠️ WARNING: Some models failed to load. The server will start, but endpoints may fail.")
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=port, reload=True)

@@ -25,5 +25,5 @@ RUN pip install -r backend/requirements.txt
 EXPOSE 10000
 
 # Start FastAPI
-WORKDIR /app/backend
-CMD sh -c "uvicorn main:app --host 0.0.0.0 --port ${PORT:-10000}"
+WORKDIR /app
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "10000"]
