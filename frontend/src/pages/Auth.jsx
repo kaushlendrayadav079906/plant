@@ -3,7 +3,7 @@ import { Leaf, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || 'https://plant-2-9w9a.onrender.com';
 
 export default function Auth({ setIsLoggedIn }) {
   const [isLogin, setIsLogin] = useState(true);
