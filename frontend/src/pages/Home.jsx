@@ -67,6 +67,11 @@ export default function Home({ showSplash, setShowSplash }) {
     recognition.onend = () => setIsListening(false);
     recognition.onerror = (e) => {
         console.error("Speech recognition error", e);
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+            alert("Microphone access denied. Please click the site settings icon in your browser's address bar (usually a lock or settings icon) and allow microphone access.");
+        } else {
+            alert("Speech recognition error: " + e.error);
+        }
         setIsListening(false);
     };
 
@@ -240,7 +245,11 @@ export default function Home({ showSplash, setShowSplash }) {
       setCameraError(null);
     } catch (err) {
       console.error(err);
-      setCameraError('Unable to access camera. Please allow permissions.');
+      if (err.name === 'NotAllowedError' || err.message.includes('Permission denied')) {
+        setCameraError('Camera access denied. Please click the site settings icon in your browser address bar (usually a lock or settings icon) and allow camera access, then try again.');
+      } else {
+        setCameraError('Unable to access camera: ' + err.message);
+      }
     }
   };
 
